@@ -1,0 +1,30 @@
+{
+  "name": "sidebar-herdr-opencode",
+  "version": "1.0.0",
+  "description": "High-density developer telemetry HUD and status sidebar for Herdr multiplexer and OpenCode",
+  "main": "status-sidebar.mjs",
+  "type": "module",
+  "bin": {
+    "sidebar": "./status-sidebar.mjs",
+    "snew": "./snew.mjs"
+  },
+  "scripts": {
+    "start": "node status-sidebar.mjs",
+    "attach": "node attach-sidebar.mjs",
+    "snew": "node snew.mjs"
+  },
+  "keywords": [
+    "opencode",
+    "herdr",
+    "sidebar",
+    "hud",
+    "tui",
+    "telemetry",
+    "gentle-ai",
+    "antigravity",
+    "cliproxyapi",
+    "engram"
+  ],
+  "author": "Totopo27",
+  "license": "MIT"
+}
