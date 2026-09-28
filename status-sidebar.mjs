@@ -23,7 +23,7 @@ import { execSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 // ============================================================================
-// 🎨 PALETA LINEAR / CUTE TUI (Truecolor 24-bit ANSI)
+// PALETA LINEAR / TUI (Truecolor 24-bit ANSI)
 // ============================================================================
 const BORDER = "\x1b[38;2;120;75;160m";        // #784ba0 (violeta estructural sobrio)
 const BORDER_MUTED = "\x1b[38;2;70;45;95m";    // #462d5f (separadores sutiles)
@@ -42,9 +42,24 @@ const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 
 // ============================================================================
-// ⚙️ CONFIGURACIÓN Y RUTAS LOCALES
+// CONFIGURACION Y RUTAS LOCALES (Portables & Agnosticas)
 // ============================================================================
-const AUTHS_DIR = process.env.CLIPROXY_AUTHS_DIR || "D:/DocumentosDiscoD/cliproxyapi/auths";
+function resolveAuthsDir() {
+  const candidates = [
+    process.env.CLIPROXY_AUTHS_DIR,
+    path.join(os.homedir(), ".cliproxy", "auths"),
+    path.join(os.homedir(), "cliproxyapi", "auths"),
+    "D:/DocumentosDiscoD/cliproxyapi/auths",
+    "C:/cliproxyapi/auths",
+    "D:/cliproxyapi/auths",
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return process.env.CLIPROXY_AUTHS_DIR || path.join(os.homedir(), ".cliproxy", "auths");
+}
+
+const AUTHS_DIR = resolveAuthsDir();
 const QUOTA_URL = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary";
 const USER_AGENT = "antigravity/cli/1.0.13 (aidev_client; os_type=darwin; arch=arm64)";
 const POLL_INTERVAL_MS = 120_000; // 2 minutos para el sondeo pasivo
@@ -53,7 +68,7 @@ const OPENCODE_DB_PATH = path.join(os.homedir(), ".local/share/opencode/opencode
 const ENGRAM_DB_PATH = path.join(os.homedir(), ".engram/engram.db");
 
 // ============================================================================
-// 📊 ESTADO GLOBAL & CACHÉ
+// ESTADO GLOBAL & CACHE
 // ============================================================================
 const accountsList = [];
 let lastUpdatedTime = "";
@@ -66,7 +81,7 @@ let flashNotice = null;
 let flashNoticeTimer = null;
 
 // ============================================================================
-// 📏 MOTOR DE MEDICIÓN UNICODE A PRUEBA DE DESBORDES (ZERO-WRAPPING)
+// MOTOR DE MEDICION UNICODE A PRUEBA DE DESBORDES (ZERO-WRAPPING)
 // ============================================================================
 function charWidth(codePoint) {
   if (!codePoint) return 0;
@@ -173,7 +188,7 @@ function formatRelativeReset(resetAt, now = Date.now()) {
 }
 
 // ============================================================================
-// 📦 PROVEEDORES DE DATOS NATIVOS
+// PROVEEDORES DE DATOS NATIVOS
 // ============================================================================
 
 // 1. Git Status & Log Graph (Sintaxis Dracula)
@@ -456,6 +471,41 @@ function getOpenCodeSessionData() {
   return result;
 }
 
+// 3. MCP Servers Configuration Discovery
+function getMcpData(targetDir) {
+  const mcpList = [];
+  const candidatePaths = [
+    path.join(targetDir, "opencode.json"),
+    path.join(targetDir, ".opencode", "opencode.json"),
+    path.join(os.homedir(), ".config", "opencode", "opencode.json"),
+    path.join(os.homedir(), ".opencode", "opencode.json"),
+  ];
+  if (process.env.OPENCODE_CONFIG_DIR) {
+    candidatePaths.push(path.join(process.env.OPENCODE_CONFIG_DIR, "opencode.json"));
+  }
+
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const raw = fs.readFileSync(p, "utf8");
+        const cfg = JSON.parse(raw);
+        if (cfg.mcp && typeof cfg.mcp === "object") {
+          for (const [name, val] of Object.entries(cfg.mcp)) {
+            if (name === "servers") continue;
+            const isEnabled = val?.enabled !== false;
+            const type = val?.type || (val?.url ? "remote" : "local");
+            if (!mcpList.some((m) => m.name === name)) {
+              mcpList.push({ name, enabled: isEnabled, type });
+            }
+          }
+        }
+      } catch {}
+    }
+  }
+
+  return mcpList;
+}
+
 // 3. Engram Data
 function getEngramData(projectName, projectDir) {
   let canonicalName = projectName;
@@ -525,11 +575,13 @@ function discoverAccounts() {
       const auth = JSON.parse(raw);
       const prefix = auth.prefix || (auth.email ? auth.email.split("@")[0] : file);
 
+      const authFilePath = path.join(AUTHS_DIR, file);
       let existing = accountsList.find((a) => a.prefix === prefix);
       if (!existing) {
         existing = {
           prefix,
           auth,
+          authFile: authFilePath,
           email: auth.email || "",
           rem5h: 100,
           used5h: 0,
@@ -542,6 +594,7 @@ function discoverAccounts() {
         accountsList.push(existing);
       } else {
         existing.auth = auth;
+        existing.authFile = authFilePath;
       }
     } catch {}
   }
@@ -550,6 +603,14 @@ function discoverAccounts() {
 }
 
 async function updateAccountQuota(account) {
+  // Releer el archivo auth en disco por si cliproxy refrescó el access_token
+  if (account.authFile && fs.existsSync(account.authFile)) {
+    try {
+      const freshRaw = fs.readFileSync(account.authFile, "utf8");
+      account.auth = JSON.parse(freshRaw);
+    } catch {}
+  }
+
   const { auth } = account;
   if (!auth || !auth.access_token || auth.disabled) return;
 
@@ -616,12 +677,23 @@ async function updateAccountQuota(account) {
       account.isWarning = usedPercent >= 70 && usedPercent < 85;
     } else {
       const err = await res.json().catch(() => ({}));
-      if (err?.error?.message?.includes("Verify your account")) {
+      if (res.status === 401 || err?.error?.message?.includes("expired") || err?.error?.status === "UNAUTHENTICATED") {
         account.hasError = true;
-        account.errorMsg = "Verif. requerida";
+        account.errorMsg = "token expirado";
+      } else if (err?.error?.message?.includes("Verify your account") || err?.error?.details?.some((d) => d.reason === "VALIDATION_REQUIRED")) {
+        account.hasError = true;
+        account.errorMsg = "verif. requerida";
+      } else if (res.status === 429) {
+        account.hasError = true;
+        account.errorMsg = "rate limited";
+      } else {
+        account.hasError = true;
+        account.errorMsg = "err " + res.status;
       }
     }
-  } catch {}
+  } catch (e) {
+    // Si hubo timeout u error de red temporal, no borrar datos previos si ya existían
+  }
 }
 
 /**
@@ -687,7 +759,7 @@ function getBestHealthyTargetPrefix() {
     .filter((a) => !a.isCritical && !a.hasError)
     .sort((a, b) => b.rem5h - a.rem5h);
 
-  return healthyAccounts[0]?.prefix || "gianni";
+  return healthyAccounts[0]?.prefix || accountsList[0]?.prefix || "default";
 }
 
 function migrateCriticalSessions() {
@@ -728,8 +800,10 @@ function migrateCriticalSessions() {
     if (totalMigrated > 0) {
       setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas de [${migratedFrom.join(", ")}] a ${targetPrefix}!`);
 
-      // 🧠 Auto-Snapshot en Engram al Migrar:
-      const engramBin = "C:\\Users\\Gustavo\\AppData\\Local\\engram\\bin\\engram.exe";
+      // Snapshot en Engram al Migrar:
+      const engramBin = process.env.LOCALAPPDATA
+        ? path.join(process.env.LOCALAPPDATA, "engram", "bin", "engram.exe")
+        : path.join(os.homedir(), "AppData", "Local", "engram", "bin", "engram.exe");
       if (fs.existsSync(engramBin)) {
         try {
           const engramProject = path.basename(sessionData.activeDirectory || process.cwd()).toLowerCase();
@@ -747,7 +821,7 @@ function migrateCriticalSessions() {
 
     scheduleRender();
   } catch (err) {
-    setFlashNotice(`⚠ Error al migrar: ${err.message}`);
+    setFlashNotice(`[error] Error al migrar: ${err.message}`);
   }
 
   return totalMigrated;
@@ -764,7 +838,7 @@ function setFlashNotice(msg, durationMs = 4000) {
 }
 
 // ============================================================================
-// 🎨 PIPELINE DE RENDERIZADO PIXEL-PERFECT (Zero-Scrollback / Alternate Screen)
+// PIPELINE DE RENDERIZADO PIXEL-PERFECT (Zero-Scrollback / Alternate Screen)
 // ============================================================================
 function render() {
   const cols = process.stdout.columns || 46;
@@ -787,6 +861,7 @@ function render() {
   }
 
   const engram = getEngramData(folder.toLowerCase(), targetDir);
+  const mcpList = getMcpData(targetDir);
   const activePrefixes = opencode.allActivePrefixes;
 
   // Primitivas de dibujo indestructibles con parámetros tipados
@@ -857,13 +932,14 @@ function render() {
   lines.push(drawRow(`${GOLD}Model${RESET}`, activeModelDisplay));
   
   // Listado de perfiles activos en la línea sub-vitals
-  const activeProfLabels = Array.from(activePrefixes).map((p) => `${ACCENT_PINK}❀${RESET} ${MINT}${p}${RESET}`).join(" ") || `${TEXT_MUTED}default${RESET}`;
-  const subVitals = `${ACCENT_PRIMARY}🧠${RESET} ${TEXT_PRIMARY}${engram.project}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_MUTED}4 MCPs${RESET} ${TEXT_DIM}·${RESET} ${activeProfLabels}`;
+  const mcpCountStr = mcpList.length > 0 ? `${mcpList.length} MCPs` : "0 MCPs";
+  const activeProfLabels = Array.from(activePrefixes).map((p) => `${ACCENT_PINK}*${RESET} ${MINT}${p}${RESET}`).join(" ") || `${TEXT_MUTED}default${RESET}`;
+  const subVitals = `${ACCENT_PRIMARY}mem:${RESET} ${TEXT_PRIMARY}${engram.project}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_MUTED}${mcpCountStr}${RESET} ${TEXT_DIM}·${RESET} ${activeProfLabels}`;
   lines.push(drawRow(subVitals, `${ACCENT_PINK}▸${RESET}`));
   lines.push(drawBottom());
 
-  // 3. ✿ Context Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Context${RESET}`));
+  // 3. Context Card
+  lines.push(drawTop(`${BOLD}${GOLD}Context${RESET}`));
   const contextLimit = 1_000_000;
   const currentTokens = opencode.activeTurnContextTokens > 0
     ? opencode.activeTurnContextTokens
@@ -900,19 +976,19 @@ function render() {
   const rightCost = `${GOLD}Cost${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
   lines.push(drawRow(leftBreakdown, rightCost));
   if (isMature || isSaturated) {
-    lines.push(drawRow(`${AMBER}💡 Sesión madura: usá /snew para handover limpio${RESET}`));
+    lines.push(drawRow(`${AMBER}[aviso] Sesion madura: usa /snew para handover limpio${RESET}`));
   }
   lines.push(drawBottom());
 
-  // 4. 🧠 Engram Card
-  lines.push(drawTop(`🧠 ${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`));
+  // 4. Engram Card
+  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`));
   const localOnlineStatus = engram.online ? `${MINT}● Online${RESET}` : `${CORAL}○ Caído${RESET}`;
-  lines.push(drawRow(`🖥 Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
+  lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
   if (engram.cloudHost) {
     const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
-    lines.push(drawRow(`☁ Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
+    lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
   } else {
-    lines.push(drawRow(`☁ Cloud: ${TEXT_DIM}local only${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+    lines.push(drawRow(`Cloud: ${TEXT_DIM}local only${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
   }
   lines.push(drawBottom());
 
@@ -946,7 +1022,7 @@ function render() {
       if (acc.hasError) {
         icon = `${AMBER}?${RESET}`;
         pctColor = AMBER;
-        statusNote = `${AMBER}${acc.errorMsg}${RESET}`;
+        statusNote = `${AMBER}[${acc.errorMsg}]${RESET}`;
       } else if (acc.isCritical) {
         icon = `${BOLD}${CORAL}!${RESET}`;
         pctColor = CORAL;
@@ -958,11 +1034,12 @@ function render() {
       }
 
       const pfxDisplay = isActive
-        ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(6)}${RESET}`
-        : `${TEXT_MUTED}${acc.prefix.padEnd(6)}${RESET}`;
+        ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(5)}${RESET}`
+        : `${TEXT_MUTED}${acc.prefix.padEnd(5)}${RESET}`;
 
       const pctDisplay = `${BOLD}\x1b[38;2;${pctColor.slice(7)}${String(acc.rem5h).padStart(3)}%${RESET}`;
-      const leftCol = `${marker} ${icon} ${pfxDisplay} ${pctDisplay} ${statusNote}`;
+      const statusSuffix = statusNote ? ` ${statusNote}` : "";
+      const leftCol = `${marker} ${icon} ${pfxDisplay} ${pctDisplay}${statusSuffix}`;
       const rightGauge = renderGaugeInline(acc.rem5h, miniBarCells, (s) => `\x1b[38;2;${pctColor.slice(7)}${s}${RESET}`);
 
       lines.push(drawRow(leftCol, rightGauge));
@@ -1000,7 +1077,7 @@ function render() {
       lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`));
 
       if (acc.hasError) {
-        lines.push(drawRow(`${AMBER}⚠️ ${acc.errorMsg}${RESET}`));
+        lines.push(drawRow(`${AMBER}! ${acc.errorMsg}${RESET}`));
       }
 
       const poolGaugeCells = Math.max(8, Math.min(14, innerWidth - 28));
@@ -1039,16 +1116,32 @@ function render() {
   lines.push(drawRow(changesSummary, `${TEXT_DIM}/gentle:changes${RESET}`));
   lines.push(drawBottom());
 
-  // 7. 🛠 Tools Telemetry Card
+  // 7. Tools Telemetry Card
   const toolsCount = opencode.tools.total > 0 ? opencode.tools : { read: 6, write: 7, bash: 16, engram: 1, other: 1, total: 31 };
-  const toolsTitleFmt = `🛠 ${BOLD}${GOLD}tools${RESET} ${TEXT_DIM}· ${toolsCount.total} calls${RESET}`;
+  const toolsTitleFmt = `${BOLD}${GOLD}tools${RESET} ${TEXT_DIM}· ${toolsCount.total} calls${RESET}`;
   lines.push(drawTop(toolsTitleFmt));
 
   const pRead = `${MAGENTA}✎ ${toolsCount.read} read${RESET}`;
   const pWrite = `${CYAN}✎ ${toolsCount.write} write${RESET}`;
   const pBash = `${MINT}>_ ${toolsCount.bash} bash${RESET}`;
-  const pEngram = `${CORAL}🧠 ${toolsCount.engram} mem${RESET}`;
+  const pEngram = `${CORAL}mem: ${toolsCount.engram}${RESET}`;
   lines.push(drawRow(`${pRead}  ${pWrite}  ${pBash}`, pEngram));
+  lines.push(drawBottom());
+
+  // 8. MCP Servers Card
+  const mcpTitle = `${BOLD}${GOLD}MCP Servers${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
+  lines.push(drawTop(mcpTitle));
+  if (mcpList.length === 0) {
+    lines.push(drawRow(`${TEXT_DIM}Sin MCP servers configurados${RESET}`));
+  } else {
+    for (const mcp of mcpList) {
+      const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
+      const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
+      const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
+      const statusText = mcp.enabled ? `${MINT}online${RESET}` : `${TEXT_MUTED}disabled${RESET}`;
+      lines.push(drawRow(`${statusDot} ${nameFmt} ${typeBadge}`, statusText));
+    }
+  }
   lines.push(drawBottom());
 
   // Barra de atajos inferior dinámica
@@ -1071,7 +1164,7 @@ function render() {
 }
 
 // ============================================================================
-// ⌨️ ATAJOS DE TECLADO Y CICLO DE VIDA
+// ATAJOS DE TECLADO Y CICLO DE VIDA
 // ============================================================================
 if (process.stdin.isTTY) {
   process.stdin.setRawMode(true);

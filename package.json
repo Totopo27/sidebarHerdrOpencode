@@ -6,12 +6,14 @@
   "type": "module",
   "bin": {
     "sidebar": "./status-sidebar.mjs",
-    "snew": "./snew.mjs"
+    "snew": "./snew.mjs",
+    "sclose": "./sclose.mjs"
   },
   "scripts": {
     "start": "node status-sidebar.mjs",
     "attach": "node attach-sidebar.mjs",
-    "snew": "node snew.mjs"
+    "snew": "node snew.mjs",
+    "sclose": "node sclose.mjs"
   },
   "keywords": [
     "opencode",

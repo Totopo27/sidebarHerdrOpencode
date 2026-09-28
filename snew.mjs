@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * 🌸 snew: Handover y Creación de Sesión Limpia para OpenCode & Herdr 💜
+ * ===========================================================================
+ *  snew: Handover y Creacion de Sesion Limpia para OpenCode & Herdr
+ * ===========================================================================
  *
  * Flujo:
  * 1. Registra un hito de Handover en Engram para el proyecto activo.
  * 2. Si se ejecuta dentro de Herdr:
  *    - Abre una nueva pestaña limpia enfocada en el directorio actual.
  *    - Lanza OpenCode en el pane izquierdo.
- *    - Divide a la derecha con ratio 0.74 y arranca el sidebar con cuotas y métricas.
- * 3. Si se ejecuta en terminal independiente, lanza opencode con la nueva sesión.
+ *    - Divide a la derecha con ratio 0.74 y arranca el sidebar con cuotas y metricas.
+ * 3. Si se ejecuta en terminal independiente, lanza opencode con la nueva sesion.
  */
 
 import * as fs from "node:fs";
@@ -32,10 +34,12 @@ try {
   }
 } catch {}
 
-console.log(`\x1b[38;2;123;138;255m✿ snew:\x1b[0m Iniciando handover para proyecto \x1b[1m${projectName}\x1b[0m...`);
+console.log(`\x1b[38;2;123;138;255m[snew]\x1b[0m Iniciando handover para proyecto \x1b[1m${projectName}\x1b[0m...`);
 
 // 1. Guardar Snapshot de Handover en Engram
-const engramBin = "C:\\Users\\Gustavo\\AppData\\Local\\engram\\bin\\engram.exe";
+const engramBin = process.env.LOCALAPPDATA
+  ? path.join(process.env.LOCALAPPDATA, "engram", "bin", "engram.exe")
+  : path.join(os.homedir(), "AppData", "Local", "engram", "bin", "engram.exe");
 if (fs.existsSync(engramBin)) {
   try {
     const title = `Handover: Nueva sesion limpia para ${projectName}`;
@@ -44,7 +48,7 @@ if (fs.existsSync(engramBin)) {
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 4000,
     });
-    console.log(`\x1b[38;2;76;183;130m✓\x1b[0m Handover registrado en Engram.`);
+    console.log(`\x1b[38;2;76;183;130m[ok]\x1b[0m Handover registrado en Engram.`);
   } catch {
     // Continuar sin bloquear si engram no responde
   }

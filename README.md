@@ -1,134 +1,188 @@
-# 🌸 Sidebar Herdr OpenCode 💜
-> **High-Density Developer HUD & Live Telemetry Sidebar for Herdr & OpenCode**  
-> *Crafted with Linear & Anti-Slop Design Principles, Native Zero-Dependency SQLite Engine, and Multi-Account Quota Guardian.*
+# Sidebar Herdr OpenCode
+
+> High-Density Developer HUD and Live Telemetry Sidebar for Herdr and OpenCode.
+> Architected with Linear-inspired design density, zero-dependency native SQLite inspection, multi-account quota monitoring, and session lifecycle controls.
 
 ---
 
-## 📸 Overview
+## Overview
 
-**Sidebar Herdr OpenCode** is an ambient, high-density terminal HUD designed to run alongside [OpenCode](https://opencode.ai) inside the [Herdr](https://herdr.dev) terminal multiplexer. It transforms your terminal split into a cohesive, mission-control developer workspace displaying real-time session vitals, token consumption gauges, Engram persistent memory status, multi-account API quotas, Git commit history graphs, and live tool telemetry.
+Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside OpenCode inside the Herdr terminal multiplexer. It splits the terminal into an integrated workspace providing real-time telemetry: active session metrics, context window token consumption gauges, Engram persistent memory status, multi-account API quotas with automated migration, recent Git history graphs, live tool call telemetry, and MCP server states.
 
 ```text
-           ✿ OPENCODE · GENTLE-AI ✿
-╭─ ✿ Status ───────────────────────────────╮
-│ Project            ~/.../mi-proyecto     │
-│ Branch                        ᛦ main ±2  │
-│ Model        gemini-3.8-flash-high (high)│
-│ 🧠 mi-proyecto · 4 MCPs · ❀ xen1  ▸      │
-╰──────────────────────────────────────────╯
-╭─ ✿ Context ──────────────────────────────╮
-│ 125.0k / 1.0M tokens        ● Óptimo 12.5%
-│ ▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱
-│ ▲ 1.4M in · ▼ 12.6k out        Cost $0.000
-╰──────────────────────────────────────────╯
-╭─ 🧠 Engram: mi-proyecto ▲ ───────────────╮
-│ 🖥 Local (7437)         ● Online · 80 obs│
-│ ☁ Cloud: local only     ○ no configurado │
-╰──────────────────────────────────────────╯
-╭─ ✿ Integrations · 5 cuentas ─────────────╮
-│    ● gianni 100%               ▰▰▰▰▰▰▰▰▰▰│
-│    ● tavo   100%               ▰▰▰▰▰▰▰▰▰▰│
-│  ▸ ● xen1    74% en 2h 25m     ▰▰▰▰▰▰▰▱▱▱│
-│    ● xen2   100%               ▰▰▰▰▰▰▰▰▰▰│
-│    ● xen3   100%               ▰▰▰▰▰▰▰▰▰▰│
-╰──────────────────────────────────────────╯
-╭─ ✿ antigravity · xen1 (activa) ──────────╮
-│ ● Gemini Wk   74% en 4d 4h   ▰▰▰▰▰▰▰▰▰▱▱▱│
-│ ● Gemini 5h   24% en 26m     ▰▰▰▱▱▱▱▱▱▱▱▱│
-│ ● Claude Wk   30% en 2d 5h   ▰▰▰▰▱▱▱▱▱▱▱▱│
-│ ● Claude 5h  100% en 4h 59m  ▰▰▰▰▰▰▰▰▰▰▰▰│
-╰──────────────────────────────────────────╯
-╭─ ᛦ git graph ────────────────────────────╮
-│ main                             ✔ clean │
-│ * 858ee20 (HEAD -> main) feat: core hud  │
-│ ✎ 0 files · clean         /gentle:changes│
-╰──────────────────────────────────────────╯
-╭─ 🛠 tools · 70 calls ─────────────────────╮
-│ ✎ 23 read   ✎ 9 write   >_ 21 bash 🧠 17 mem
-╰──────────────────────────────────────────╯
+               OPENCODE · GENTLE-AI
+╭─ Status ─────────────────────────────────────────╮
+│ Project                      ~/.../mi-proyecto   │
+│ Branch                                  main ±2  │
+│ Model              gemini-3.8-flash-high (high)  │
+│ mem: mi-proyecto · 4 MCPs · * acc-main ▸         │
+╰──────────────────────────────────────────────────╯
+╭─ Context ────────────────────────────────────────╮
+│ 125.0k / 1.0M tokens               Optimo 12.5%  │
+│ [================..............................] │
+│ ^ 1.4M in · v 12.6k out              Cost $0.000 │
+╰──────────────────────────────────────────────────╯
+╭─ Engram: mi-proyecto ^ ──────────────────────────╮
+│ Local (7437)                   Online · 80 obs   │
+│ Cloud: local only              no configurado    │
+╰──────────────────────────────────────────────────╯
+╭─ Integrations · 5 cuentas ───────────────────────╮
+│    acc-1  100%               [================]  │
+│    acc-2  100%               [================]  │
+│  ▸ acc-3   74% en 2h 25m     [============....]  │
+│    acc-4  100%               [================]  │
+│    acc-5  100%               [================]  │
+╰──────────────────────────────────────────────────╯
+╭─ antigravity · acc-3 (activa) ───────────────────╮
+│ Gemini Wk   74% en 4d 4h     [============....]  │
+│ Gemini 5h   24% en 26m       [====............]  │
+│ Claude Wk   30% en 2d 5h     [=====...........]  │
+│ Claude 5h  100% en 4h 59m    [================]  │
+╰──────────────────────────────────────────────────╯
+╭─ git graph ──────────────────────────────────────╮
+│ main                                      clean  │
+│ * 858ee20 (HEAD -> main) feat: core hud          │
+│ 0 files · clean                  /gentle:changes │
+╰──────────────────────────────────────────────────╯
+╭─ tools · 70 calls ───────────────────────────────╮
+│ 23 read   9 write   >_ 21 bash   mem: 17         │
+╰──────────────────────────────────────────────────╯
+╭─ MCP Servers · 3 activos ────────────────────────╮
+│ engram [local]                            online │
+│ context7 [remote]                         online │
+│ browser [local]                           online │
+╰──────────────────────────────────────────────────╯
  r: refresh all · x: migrar · q: quit · 2m
 ```
 
 ---
 
-## ✨ Características Principales
+## Technical Architecture & HUD Modules
 
-### 1. 🎛️ Suite Completa de Tarjetas HUD
-* **✿ Status Card:** Proyecto activo, rama Git con indicador de archivos modificados (`±N`), modelo en uso (`gemini-3.8-flash-high (high)`), MCP servers activos y perfil de cuenta seleccionado (`❀ xen1 ▸`).
-* **✿ Context Gauge Card:** Medición del tamaño de contexto en tokens del turno activo sobre la ventana de 1.0M. Semáforo progresivo:
-  - 🟢 **Óptimo (< 500k tokens):** Verde menta con barra proporcional.
-  - 🟡 **Maduro (500k – 799k tokens):** Badge ámbar `● Maduro XX% [/snew]` con aviso para planificar handover limpio.
-  - 🔴 **Saturado (≥ 800k tokens):** Alerta en rojo coral `● Saturado [/snew]` para evitar degradación de contexto.
-  - Desglose acumulativo de tokens `▲ In · ▼ Out` y costo en USD.
-* **🧠 Engram Card:** Monitor del daemon de memoria persistente de Engram (`🖥️ Local (7437) ● Online · N obs`). Soporte dinámico de nube privada con protección contra fugas de infraestructura ajena.
-* **✿ Integrations Card (Las 5 cuentas a la vista):**
-  - Vista panorámica de todas tus cuentas (`gianni`, `tavo`, `xen1`, `xen2`, `xen3`) con sus medidores de la ventana móvil de 5 horas.
-  - **Soporte Multi-Sesión en Paralelo:** Si trabajas en varios tabs/spaces con distintas cuentas, el HUD marca todas las que estén en uso activo con el triángulo rosa `▸`.
-  - **Sistema de Alertas Progresivo:**
-    - `[AVISO 70%]`: Se tiñe en amarillo ámbar a partir del 70% de consumo con línea explicativa.
-    - `[AGOTÁNDOSE]`: Escala a rojo coral brillante al superar el 85% de consumo.
-* **✿ Active Account Breakdown Card (4 Piscinas):**
-  - Ubicado justo debajo de Integrations, desglosa las **4 cuotas reales** de la(s) cuenta(s) en uso:
-    - `Gemini Weekly` + countdown de reseteo (`en 4d 4h`).
-    - `Gemini 5h` + countdown (`en 26m`).
-    - `Claude/GPT Weekly`.
-    - `Claude/GPT 5h`.
-* **ᛦ Git Graph Card:** Árbol de commits reciente renderizado con sintaxis Dracula (nodos `*` en rosa, hashes en dorado, ramas en menta/magenta), badges de estado porcelain y resumen de líneas cambiadas (`+X -Y /gentle:changes`).
-* **🛠 Live Tools Telemetry Card:** Pastillas visuales que contabilizan en tiempo real las herramientas ejecutadas en la sesión (`read`, `write`, `bash`, `engram`, `other`).
+### 1. Status Card
+- Displays active project root, current Git branch with working tree mutation indicators (`±N`), selected LLM model identifier and profile rating.
+- Shows active sub-vitals line: resolved Engram memory namespace, active MCP server tally, and configured account profile indicator.
+
+### 2. Context Gauge Card
+- Real-time token consumption tracking over the 1,000,000 token window.
+- Three-stage context lifecycle thresholds:
+  - **Optimal (< 500k tokens):** Mint indicator with proportional fill gauge.
+  - **Mature (500k – 799k tokens):** Amber warning indicator suggesting a clean handover via `/snew`.
+  - **Saturated (>= 800k tokens):** Coral alert indicator warning against context degradation.
+- Cumulative input/output token counters and estimated USD session cost.
+
+### 3. Engram Persistent Memory Card
+- Direct socket health check against the local Engram daemon (`http://127.0.0.1:7437/health`).
+- Displays total stored observations, project scoping, and private cloud synchronization status.
+
+### 4. Integrations Card (Multi-Account Fleet Overview)
+- Comprehensive view across all configured auth profiles (`cliproxyapi/auths`).
+- **Parallel Multi-Session Detection:** Marks accounts currently bound to active unarchived OpenCode sessions across any Herdr pane with `▸`.
+- **Cascading Quota Alerts:**
+  - `[AVISO 70%]`: Amber badge triggered upon reaching 70% 5-hour rolling quota consumption.
+  - `[AGOTANDOSE]`: Coral badge triggered at 85% consumption, notifying that the account is approaching exhaustion.
+
+### 5. Active Account Pools Breakdown Card
+- Deep breakdown of the 4 quota pools for the account actively driving the current session:
+  - Gemini Weekly pool + relative reset countdown.
+  - Gemini 5-hour rolling window + reset countdown.
+  - Claude / Secondary model weekly pool.
+  - Claude / Secondary model 5-hour window.
+
+### 6. Git Graph Card
+- Commit tree preview rendered with branch indicators, porcelain status checks, modified/staged file counts, and net diff line totals (`+X -Y`).
+
+### 7. Tools Telemetry Card
+- Live invocation counters categorizing assistant tool calls into discrete domains (`read`, `write`, `bash`, `engram/mem`, `other`).
+
+### 8. MCP Servers Card
+- Automatic discovery of configured Model Context Protocol servers across project, user, and global `opencode.json` configuration manifests.
+- Displays server transport type (`local` / `remote`) and operational readiness status.
 
 ---
 
-## ⚡ Innovaciones de Rendimiento y Arquitectura
+## Session Lifecycle and Account Release Architecture
 
-1. **Snapshot + Reactive Active Polling (Mitigación de `403 VALIDATION_REQUIRED`):**
-   - Al iniciar, realiza **1 solo barrido** de todas las cuentas para darte la foto general.
-   - En el intervalo periódico (cada 2 minutos), **SOLO consulta la(s) cuenta(s) activa(s) en uso**. Esto reduce las llamadas a Google Cloud Code en más de un **80%**, evitando disparar los sistemas de detección de bots.
-   - Al terminar cualquier turno del asistente en OpenCode, el sidebar lo detecta localmente en milisegundos y refresca de inmediato la cuenta activa.
-2. **Motor Unicode de Ancho Real a Nivel de Píxel ($O(N)$):**
-   - Algoritmo que mide con precisión caracteres anchos, emojis (`🧠`, `🖥️`, `☁️`), símbolos monoespaciados y selectores de variación (`\uFE0F`).
-   - Marcos matemáticamente indestructibles (`╭─`, `│`, `├─`, `╰─`). Cero desbordes horizontales o saltos de línea indeseados en Windows Terminal, ConHost, Alacritty o WezTerm.
-3. **Alternate Screen Buffer (`\x1b[?1049h`):**
-   - Corre en el búfer alternativo de terminal (igual que `vim` o `htop`). **Cero contaminación del historial de scrollback**.
-4. **Motor SQLite Nativo (`node:sqlite`):**
-   - Lee `opencode.db` y `engram.db` directamente en microsegundos sin requerir compiladores C++, GCC ni paquetes npm pesados como `better-sqlite3`.
+### The Problem: Account Locking vs. Session Units
+When running multiple spaces or tabs in Herdr with shared API accounts, closing work in one space must not inadvertently terminate access for another concurrent space using the same credentials.
+
+### The Solution: SQLite-Driven Reactive De-allocation
+1. OpenCode tracks sessions inside `session_v2` in `~/.local/share/opencode/opencode.db`.
+2. The HUD inspects active sessions using `SELECT agent, model, time_archived FROM session_v2 WHERE time_archived IS NULL`.
+3. When ending work in a space via natural language or `/sclose`:
+   - Engram persists session state via `mem_session_summary`.
+   - The session record is archived by setting `time_archived = Date.now()`.
+   - The HUD sidebar automatically recalculates active accounts in its 3-second local polling loop:
+     - **Single-space usage:** The account indicator `▸` turns off immediately, releasing the account.
+     - **Multi-space usage:** If another open space/pane still references the same account prefix, the account remains marked active for that space.
 
 ---
 
-## ⌨️ Atajos y Comandos Interactivos
+## Interactive Shortcuts and Commands
 
-| Comando / Atajo | Dónde se usa | Acción |
+| Command / Shortcut | Execution Context | Description |
 | :--- | :--- | :--- |
-| **`r`** | En el sidebar | **Refresco Panorámico Instantáneo:** Consulta las 5 cuentas al mismo tiempo para actualizar sus métricas bajo demanda. |
-| **`x`** | En el sidebar | **Migración Automática de Cuenta Crítica:** Detecta si tu cuenta activa está agotada (≥85%), busca la cuenta más saludable disponible y reasigna automáticamente las sesiones abiertas en OpenCode, grabando un checkpoint inmutable en Engram. |
-| **`↑` / `↓`** o **`k` / `j`** | En el sidebar | **Navegación / Scroll:** Desplaza el viewport si la ventana del terminal es muy pequeña. |
-| **`q`** | En el sidebar | Salir y restaurar la pantalla anterior de la terminal. |
-| **`/snew`** | En el chat de OpenCode | **Handover de Sesión:** El agente corre `mem_session_summary` en Engram y genera un bloque de handover conciso para arrancar una sesión limpia. |
-| **`snew`** | En terminal / Herdr | **Nueva Pestaña Limpia:** Abre una nueva pestaña en Herdr enfocada en el directorio actual, lanzando OpenCode a la izquierda (74%) y el sidebar a la derecha (26%). |
-| **`sidebar`** | En terminal / Herdr | Abre o conecta el sidebar lateral con ratio perfecto (74/26). |
+| **`r`** | Sidebar TUI | **Full Fleet Refresh:** Queries all configured accounts concurrently to update quotas on demand. |
+| **`x`** | Sidebar TUI | **Automated Critical Migration:** Migrates active sessions from critical accounts (>= 85% used) to the healthiest available account, logging a checkpoint in Engram. |
+| **`k` / `j`** or **Up / Down** | Sidebar TUI | **Viewport Scroll:** Navigates vertical content when terminal height is constrained. |
+| **`q`** | Sidebar TUI | Clean exit restoring the previous terminal screen buffer. |
+| **`/snew`** | OpenCode Chat | **Session Handover:** Persists `mem_session_summary` in Engram and outputs a structured handover block to start a clean session. |
+| **`/sclose`** | OpenCode Chat | **Clean Session Termination:** Persists `mem_session_summary` in Engram, sets `time_archived` in `session_v2`, and releases the account in the HUD. |
+| **`snew`** | Terminal / Herdr | **Clean Workspace Tab:** Launches a fresh Herdr tab with OpenCode on the left (74%) and HUD on the right (26%). |
+| **`sclose`** | Terminal / Herdr | **Local Archive:** Archives the active session for the current workspace directory and updates HUD state (`--close-tab` and `--close-pane` supported). |
+| **`sidebar`** | Terminal / Herdr | Attaches or connects the HUD sidebar with standard 74/26 layout ratio. |
+
+### Natural Language Session Termination Triggers
+The orchestrator recognizes the following phrases to execute the session close workflow:
+- *"damos por finalizada la sesion de hoy"*
+- *"por hoy, eso seria, finaliza la sesion"*
+- *"Quiero finalizar el uso de esta cuenta por ahora"*
+- *"Terminamos por hoy"*
+- *"finalizar sesion"*
 
 ---
 
-## 📦 Instalación y Configuración
+## Performance & Optimization Engineering
 
-### 1. Requisitos Previos
-- **Node.js ≥ 22.0.0** (incluye soporte nativo para `node:sqlite`).
-- **Herdr** (opcional pero recomendado como multiplexer).
-- **OpenCode** (con base de datos en `~/.local/share/opencode/opencode.db`).
-- **CLIProxyAPI** (ejecutándose en `http://127.0.0.1:8317`).
-- **Engram** (opcional para persistencia de memoria).
+1. **Snapshot + Reactive Active Polling:**
+   - Performs a single startup sweep of all accounts.
+   - Background routine polls exclusively active accounts every 2 minutes. This minimizes Google Cloud Code API requests by over 80%, eliminating bot-detection and validation-required triggers.
+   - Instant local reactivity: Turn completions in OpenCode trigger local quota updates within milliseconds without waiting for the timer.
+2. **Deterministic Unicode Cell Metric Engine:**
+   - Width calculation algorithm accounting for zero-width joiners, variation selectors, and double-width CJK/Unicode runes.
+   - Enforces mathematical box boundaries (width 36 to 50 columns) preventing horizontal line-wrapping across terminal emulators.
+3. **Alternate Screen Buffer (`\x1b[?1049h`):**
+   - Runs isolated in the terminal alternate buffer. Zero scrollback pollution upon exit.
+4. **Native Zero-Dependency SQLite Integration (`node:sqlite`):**
+   - Directly queries `opencode.db` and `engram.db` via Node.js native bindings with microsecond read latencies, avoiding external C++ compiler toolchains.
 
-### 2. Estructura de Archivos
-Ubica esta carpeta en tu disco, por ejemplo:
-`D:\DocumentosDiscoD\sidebarHerdrOpencode\`
+---
 
-Archivos incluidos:
-- `status-sidebar.mjs`: Script principal de telemetría y HUD en terminal.
-- `attach-sidebar.mjs`: Script para dividir panes en Herdr con ratio 0.74/0.26.
-- `snew.mjs`: Generador de nueva pestaña y handover de sesión.
-- `status-sidebar.cmd`, `add-sidebar.cmd`: Lanzadores para Windows.
+## Installation & Setup
 
-### 3. Configurar Shims Globales (Scoop / PATH)
-Para poder ejecutar `sidebar` y `snew` desde cualquier consola, agrega en tu directorio de shims (ej. `C:\Users\<TuUsuario>\scoop\shims\` o cualquier carpeta en tu PATH de Windows):
+### Prerequisites
+- **Node.js >= 22.0.0** (native `node:sqlite` support).
+- **Herdr** (terminal multiplexer).
+- **OpenCode** (SQLite database located at `~/.local/share/opencode/opencode.db`).
+- **CLIProxyAPI** (running at `http://127.0.0.1:8317`).
+- **Engram** (persistent memory daemon at `http://127.0.0.1:7437`).
+
+### Repository File Structure
+```text
+sidebarHerdrOpencode/
+├── status-sidebar.mjs      Main TUI telemetry HUD script
+├── attach-sidebar.mjs      Split management script for Herdr (0.74/0.26 ratio)
+├── snew.mjs                Clean session creator and handover script
+├── sclose.mjs              Session termination and account de-allocation script
+├── status-sidebar.cmd      Windows launcher for sidebar
+├── add-sidebar.cmd         Windows launcher for split attachment
+├── sclose.cmd              Windows launcher for sclose
+├── package.json            Project manifest and binary definitions
+└── README.md               Technical documentation
+```
+
+### Global Shim Setup (Windows / POSIX)
+Add launcher scripts to a directory registered in your `PATH` (such as `~/.local/bin` or Scoop shims):
 
 **`sidebar.cmd`**:
 ```cmd
@@ -139,37 +193,30 @@ if "%1"=="run" goto run_sidebar
 where herdr >nul 2>&1
 if errorlevel 1 goto run_sidebar
 
-node "D:\DocumentosDiscoD\sidebarHerdrOpencode\attach-sidebar.mjs"
+node "%~dp0\attach-sidebar.mjs"
 if not errorlevel 1 exit /b 0
 
 :run_sidebar
 chcp 65001 >nul
-node "D:\DocumentosDiscoD\sidebarHerdrOpencode\status-sidebar.mjs"
+node "%~dp0\status-sidebar.mjs"
 ```
 
 **`snew.cmd`**:
 ```cmd
 @echo off
 chcp 65001 >nul
-node "D:\DocumentosDiscoD\sidebarHerdrOpencode\snew.mjs" %*
+node "%~dp0\snew.mjs" %*
 ```
 
-### 4. Comando Nativo `/snew` en OpenCode
-En tu archivo de configuración de OpenCode (`opencode.json`), añade la sección `"commands"`:
-
-```json
-{
-  "commands": {
-    "snew": {
-      "description": "Cierra sesión en Engram con resumen de handover y prepara inicio limpio",
-      "template": "Por favor genera el resumen de cierre de sesión en Engram usando mem_session_summary registrando los logros, decisiones y estado actual, y escribe un bloque de handover conciso para que pueda continuar inmediatamente en una nueva sesión limpia."
-    }
-  }
-}
+**`sclose.cmd`**:
+```cmd
+@echo off
+chcp 65001 >nul
+node "%~dp0\sclose.mjs" %*
 ```
 
 ---
 
-## 🛡️ Licencia
+## License
 
-Distribuido bajo licencia **MIT**. Desarrollado con dedicación técnica y rigor arquitectónico por **Totopo27** para la comunidad de desarrolladores de OpenCode, Herdr y Gentle-AI.
+Distributed under the **MIT License**. Engineered for technical precision, performance density, and stability within OpenCode, Herdr, and Gentle-AI workflows.
