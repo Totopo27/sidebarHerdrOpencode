@@ -11,22 +11,22 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
 
 ```text
                OPENCODE · GENTLE-AI
-╭─ Status ─────────────────────────────────────────╮
-│ Project                      ~/.../mi-proyecto   │
-│ Branch                                  main ±2  │
-│ Model              gemini-3.8-flash-high (high)  │
+╭─ Estado ─────────────────────────────────────────╮
+│ Proyecto                     ~/.../mi-proyecto   │
+│ Rama                                    main ±2  │
+│ Modelo             gemini-3.8-flash-high (high)  │
 │ mem: mi-proyecto · 4 MCPs · * acc-main ▸         │
 ╰──────────────────────────────────────────────────╯
-╭─ Context ────────────────────────────────────────╮
+╭─ Contexto ───────────────────────────────────────╮
 │ 125.0k / 1.0M tokens               Optimo 12.5%  │
 │ [================..............................] │
-│ ^ 1.4M in · v 12.6k out              Cost $0.000 │
+│ ^ 1.4M in · v 12.6k out             Costo $0.000 │
 ╰──────────────────────────────────────────────────╯
 ╭─ Engram: mi-proyecto ^ ──────────────────────────╮
-│ Local (7437)                   Online · 80 obs   │
-│ Cloud: local only              no configurado    │
+│ Local (7437)                 En línea · 80 obs   │
+│ Cloud: solo local             no configurado     │
 ╰──────────────────────────────────────────────────╯
-╭─ Integrations · 5 cuentas ───────────────────────╮
+╭─ Integraciones · 5 cuentas ──────────────────────╮
 │    acc-1  100%               [================]  │
 │    acc-2  100%               [================]  │
 │  ▸ acc-3   74% en 2h 25m     [============....]  │
@@ -39,31 +39,31 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
 │ Claude Wk   30% en 2d 5h     [=====...........]  │
 │ Claude 5h  100% en 4h 59m    [================]  │
 ╰──────────────────────────────────────────────────╯
-╭─ git graph ──────────────────────────────────────╮
-│ main                                      clean  │
+╭─ gráfico git ────────────────────────────────────╮
+│ main                                      limpio │
 │ * 858ee20 (HEAD -> main) feat: core hud          │
-│ 0 files · clean                  /gentle:changes │
+│ 0 archivos · limpio              /gentle:changes │
 ╰──────────────────────────────────────────────────╯
-╭─ tools · 70 calls ───────────────────────────────╮
-│ 23 read   9 write   >_ 21 bash   mem: 17         │
+╭─ herramientas · 70 llamadas ─────────────────────╮
+│ 23 lecturas   9 escrituras   >_ 21 bash  mem: 17 │
 ╰──────────────────────────────────────────────────╯
-╭─ MCP Servers · 3 activos ────────────────────────╮
-│ engram [local]                            online │
-│ context7 [remote]                         online │
-│ browser [local]                           online │
+╭─ Servidores MCP · 3 activos ─────────────────────╮
+│ engram [local]                          en línea │
+│ context7 [remote]                       en línea │
+│ browser [local]                         en línea │
 ╰──────────────────────────────────────────────────╯
- r: refresh all · x: migrar · q: quit · 2m
+ r: actualizar todo · x: migrar · q: salir · 2m
 ```
 
 ---
 
 ## Technical Architecture & HUD Modules
 
-### 1. Status Card
+### 1. Estado Card
 - Displays active project root, current Git branch with working tree mutation indicators (`±N`), selected LLM model identifier and profile rating.
 - Shows active sub-vitals line: resolved Engram memory namespace, active MCP server tally, and configured account profile indicator.
 
-### 2. Context Gauge Card
+### 2. Contexto Gauge Card
 - Real-time token consumption tracking over the 1,000,000 token window.
 - Three-stage context lifecycle thresholds:
   - **Optimal (< 500k tokens):** Mint indicator with proportional fill gauge.
@@ -75,7 +75,7 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
 - Direct socket health check against the local Engram daemon (`http://127.0.0.1:7437/health`).
 - Displays total stored observations, project scoping, and private cloud synchronization status.
 
-### 4. Integrations Card (Multi-Account Fleet Overview)
+### 4. Integraciones Card (Multi-Account Fleet Overview)
 - Comprehensive view across all configured auth profiles (`cliproxyapi/auths`).
 - **Parallel Multi-Session Detection:** Marks accounts currently bound to active unarchived OpenCode sessions across any Herdr pane with `▸`.
 - **Cascading Quota Alerts:**
@@ -89,13 +89,13 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
   - Claude / Secondary model weekly pool.
   - Claude / Secondary model 5-hour window.
 
-### 6. Git Graph Card
+### 6. Gráfico Git Card
 - Commit tree preview rendered with branch indicators, porcelain status checks, modified/staged file counts, and net diff line totals (`+X -Y`).
 
-### 7. Tools Telemetry Card
-- Live invocation counters categorizing assistant tool calls into discrete domains (`read`, `write`, `bash`, `engram/mem`, `other`).
+### 7. Herramientas Telemetry Card
+- Live invocation counters categorizing assistant tool calls into discrete domains (`lecturas`, `escrituras`, `bash`, `engram/mem`, `other`).
 
-### 8. MCP Servers Card
+### 8. Servidores MCP Card
 - Automatic discovery of configured Model Context Protocol servers across project, user, and global `opencode.json` configuration manifests.
 - Displays server transport type (`local` / `remote`) and operational readiness status.
 

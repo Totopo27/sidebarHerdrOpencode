@@ -922,14 +922,14 @@ function render() {
   const bannerPad = Math.max(0, Math.floor((width - stringWidth(bannerRaw)) / 2));
   lines.push(`${" ".repeat(bannerPad)}${bannerLeft} ${bannerRight}`);
 
-  // 2. ✿ Status Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Status${RESET}`));
+  // 2. ✿ Estado Card
+  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET}`));
   const shortProject = folder.length > 20 ? folder.slice(0, 18) + "…" : folder;
-  lines.push(drawRow(`${GOLD}Project${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
-  const dirtyBadge = git.isClean ? `${MINT}clean${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
-  lines.push(drawRow(`${GOLD}Branch${RESET}`, `${CYAN}ᛦ ${git.branch}${RESET} ${dirtyBadge}`));
+  lines.push(drawRow(`${GOLD}Proyecto${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
+  const dirtyBadge = git.isClean ? `${MINT}limpio${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
+  lines.push(drawRow(`${GOLD}Rama${RESET}`, `${CYAN}ᛦ ${git.branch}${RESET} ${dirtyBadge}`));
   const activeModelDisplay = `${ACCENT_PRIMARY}${opencode.modelShort}${RESET} ${GOLD}(high)${RESET}`;
-  lines.push(drawRow(`${GOLD}Model${RESET}`, activeModelDisplay));
+  lines.push(drawRow(`${GOLD}Modelo${RESET}`, activeModelDisplay));
   
   // Listado de perfiles activos en la línea sub-vitals
   const mcpCountStr = mcpList.length > 0 ? `${mcpList.length} MCPs` : "0 MCPs";
@@ -938,8 +938,8 @@ function render() {
   lines.push(drawRow(subVitals, `${ACCENT_PINK}▸${RESET}`));
   lines.push(drawBottom());
 
-  // 3. Context Card
-  lines.push(drawTop(`${BOLD}${GOLD}Context${RESET}`));
+  // 3. Contexto Card
+  lines.push(drawTop(`${BOLD}${GOLD}Contexto${RESET}`));
   const contextLimit = 1_000_000;
   const currentTokens = opencode.activeTurnContextTokens > 0
     ? opencode.activeTurnContextTokens
@@ -973,7 +973,7 @@ function render() {
   const inTokens = opencode.tokensInput > 0 ? opencode.tokensInput : 1_400_000;
   const outTokens = opencode.tokensOutput > 0 ? opencode.tokensOutput : 12_600;
   const leftBreakdown = `${TEXT_DIM}▲${RESET} ${TEXT_PRIMARY}${formatTokenCount(inTokens)}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_DIM}▼${RESET} ${TEXT_PRIMARY}${formatTokenCount(outTokens)}${RESET}`;
-  const rightCost = `${GOLD}Cost${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
+  const rightCost = `${GOLD}Costo${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
   lines.push(drawRow(leftBreakdown, rightCost));
   if (isMature || isSaturated) {
     lines.push(drawRow(`${AMBER}[aviso] Sesion madura: usa /snew para handover limpio${RESET}`));
@@ -982,17 +982,17 @@ function render() {
 
   // 4. Engram Card
   lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`));
-  const localOnlineStatus = engram.online ? `${MINT}● Online${RESET}` : `${CORAL}○ Caído${RESET}`;
+  const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
   lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
   if (engram.cloudHost) {
     const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
     lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
   } else {
-    lines.push(drawRow(`Cloud: ${TEXT_DIM}local only${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+    lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
   }
   lines.push(drawBottom());
 
-  // 5. ✿ Integrations Card (TODAS LAS 5 CUENTAS + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
+  // 5. ✿ Integraciones Card (TODAS LAS 5 CUENTAS + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
   const criticalAccounts = accountsList.filter((a) => a.isCritical);
   const warningAccounts = accountsList.filter((a) => a.isWarning);
 
@@ -1003,7 +1003,7 @@ function render() {
     intTitleRight = `${AMBER}! ${warningAccounts.length} en aviso (70%+)${RESET}`;
   }
   
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Integrations${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`));
+  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Integraciones${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`));
 
   const miniBarCells = Math.max(6, Math.min(10, innerWidth - 30));
 
@@ -1094,10 +1094,10 @@ function render() {
     }
   }
 
-  // 6. ᛦ Git Graph Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}git graph${RESET}`));
+  // 6. ᛦ Gráfico Git Card
+  lines.push(drawTop(`${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}gráfico git${RESET}`));
   const gitBadges = git.isClean
-    ? `${MINT}✔ clean${RESET}`
+    ? `${MINT}✔ limpio${RESET}`
     : `${AMBER}● ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
   lines.push(drawRow(`${CYAN}${git.branch}${RESET}`, gitBadges));
 
@@ -1111,34 +1111,34 @@ function render() {
 
   const totalDiffFiles = git.modified + git.staged;
   const changesSummary = totalDiffFiles > 0
-    ? `${ACCENT_PRIMARY}✎${RESET} ${TEXT_PRIMARY}${totalDiffFiles} files${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
-    : `${ACCENT_PRIMARY}✎${RESET} ${TEXT_DIM}0 files · clean${RESET}`;
+    ? `${ACCENT_PRIMARY}✎${RESET} ${TEXT_PRIMARY}${totalDiffFiles} archivos${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
+    : `${ACCENT_PRIMARY}✎${RESET} ${TEXT_DIM}0 archivos · limpio${RESET}`;
   lines.push(drawRow(changesSummary, `${TEXT_DIM}/gentle:changes${RESET}`));
   lines.push(drawBottom());
 
-  // 7. Tools Telemetry Card
+  // 7. Herramientas Telemetry Card
   const toolsCount = opencode.tools.total > 0 ? opencode.tools : { read: 6, write: 7, bash: 16, engram: 1, other: 1, total: 31 };
-  const toolsTitleFmt = `${BOLD}${GOLD}tools${RESET} ${TEXT_DIM}· ${toolsCount.total} calls${RESET}`;
+  const toolsTitleFmt = `${BOLD}${GOLD}herramientas${RESET} ${TEXT_DIM}· ${toolsCount.total} llamadas${RESET}`;
   lines.push(drawTop(toolsTitleFmt));
 
-  const pRead = `${MAGENTA}✎ ${toolsCount.read} read${RESET}`;
-  const pWrite = `${CYAN}✎ ${toolsCount.write} write${RESET}`;
+  const pRead = `${MAGENTA}✎ ${toolsCount.read} lecturas${RESET}`;
+  const pWrite = `${CYAN}✎ ${toolsCount.write} escrituras${RESET}`;
   const pBash = `${MINT}>_ ${toolsCount.bash} bash${RESET}`;
   const pEngram = `${CORAL}mem: ${toolsCount.engram}${RESET}`;
   lines.push(drawRow(`${pRead}  ${pWrite}  ${pBash}`, pEngram));
   lines.push(drawBottom());
 
-  // 8. MCP Servers Card
-  const mcpTitle = `${BOLD}${GOLD}MCP Servers${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
+  // 8. Servidores MCP Card
+  const mcpTitle = `${BOLD}${GOLD}Servidores MCP${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
   lines.push(drawTop(mcpTitle));
   if (mcpList.length === 0) {
-    lines.push(drawRow(`${TEXT_DIM}Sin MCP servers configurados${RESET}`));
+    lines.push(drawRow(`${TEXT_DIM}Sin servidores MCP configurados${RESET}`));
   } else {
     for (const mcp of mcpList) {
       const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
       const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
       const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
-      const statusText = mcp.enabled ? `${MINT}online${RESET}` : `${TEXT_MUTED}disabled${RESET}`;
+      const statusText = mcp.enabled ? `${MINT}en línea${RESET}` : `${TEXT_MUTED}desactivado${RESET}`;
       lines.push(drawRow(`${statusDot} ${nameFmt} ${typeBadge}`, statusText));
     }
   }
@@ -1148,8 +1148,8 @@ function render() {
   const hasCritical = accountsList.some((a) => a.isCritical || a.used5h >= 85);
   const targetHealthy = getBestHealthyTargetPrefix();
   const shortcutHint = hasCritical
-    ? `${TEXT_DIM} r: refresh · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: quit · ${lastUpdatedTime || "live"}${RESET}`
-    : `${TEXT_DIM} r: refresh all · q: quit · 2m · ${lastUpdatedTime || "live"}${RESET}`;
+    ? `${TEXT_DIM} r: actualizar · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
+    : `${TEXT_DIM} r: actualizar todo · q: salir · 2m · ${lastUpdatedTime || "en vivo"}${RESET}`;
   lines.push(shortcutHint);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
