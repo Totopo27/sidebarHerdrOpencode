@@ -781,16 +781,31 @@ function getBestHealthyTargetPrefix() {
   const sessionData = getOpenCodeSessionData();
   const activePrefixes = sessionData.allActivePrefixes;
 
+  // Función para calcular un score de salud balanceando la ventana 5h y la semanal
+  const computeHealthScore = (acc) => {
+    const rem5h = acc.rem5h ?? 100;
+    // Si tiene pools desglosados, buscar el pool semanal de Gemini
+    let remWk = 100;
+    if (Array.isArray(acc.pools)) {
+      const wkPool = acc.pools.find((p) => p.label?.toLowerCase().includes("wk"));
+      if (wkPool && typeof wkPool.percent === "number") remWk = wkPool.percent;
+    }
+    // Si la cuota semanal está al borde del colapso (< 10%), penalizar fuertemente
+    if (remWk < 10) return 0;
+    // Score ponderado: 70% peso a la ventana inmediata de 5h, 30% a la semanal
+    return Math.round(rem5h * 0.7 + remWk * 0.3);
+  };
+
   // 1. Si hay alguna cuenta activa que esté sana (> 30% libre y sin error), preferir esa
   for (const p of activePrefixes) {
-    const acc = accountsList.find((a) => a.prefix.toLowerCase() === p && !a.isCritical && !a.hasError && a.rem5h > 30);
+    const acc = accountsList.find((a) => a.prefix.toLowerCase() === p && !a.isCritical && !a.hasError && (a.rem5h > 30));
     if (acc) return acc.prefix;
   }
 
-  // 2. Si no, elegir la cuenta con mayor porcentaje libre disponible y sin error
+  // 2. Si no, elegir la cuenta con mayor score de salud balanceado
   const healthyAccounts = accountsList
     .filter((a) => !a.isCritical && !a.hasError)
-    .sort((a, b) => b.rem5h - a.rem5h);
+    .sort((a, b) => computeHealthScore(b) - computeHealthScore(a));
 
   return healthyAccounts[0]?.prefix || accountsList[0]?.prefix || "default";
 }
@@ -798,6 +813,9 @@ function getBestHealthyTargetPrefix() {
 function releaseInactiveSessions() {
   const currentSessionId = process.env.OPENCODE_SESSION_ID || null;
   let closedCount = 0;
+  const releasedPrefixes = new Set();
+  const sessionData = getOpenCodeSessionData();
+  const engramProject = path.basename(sessionData.activeDirectory || process.cwd()).toLowerCase();
 
   try {
     const listRaw = execSync("herdr pane list", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -832,14 +850,22 @@ function releaseInactiveSessions() {
     const now = Date.now();
     const db = new DatabaseSync(OPENCODE_DB_PATH, { open: true });
 
-    // Archivar sesiones huérfanas en la base de datos de OpenCode
+    // Archivar sesiones huérfanas en la base de datos de OpenCode y registrar qué cuentas liberamos
     for (const p of panes) {
       const sesId = p.agent_session?.value;
       if (sesId && sesId !== keepSessionId) {
-        const s = db.prepare("SELECT time_archived FROM session_v2 WHERE id = ?").get(sesId);
+        const s = db.prepare("SELECT agent, model, time_archived FROM session_v2 WHERE id = ?").get(sesId);
         if (s && !s.time_archived) {
           db.prepare("UPDATE session_v2 SET time_archived = ? WHERE id = ?").run(now, sesId);
           closedCount++;
+
+          const mAgent = (s.agent || "").match(/sdd-orchestrator-([a-z0-9_-]+)/i);
+          if (mAgent?.[1]) {
+            releasedPrefixes.add(mAgent[1]);
+          } else if (s.model) {
+            const mMod = String(s.model).match(/([a-z0-9_-]+)\/gemini/i);
+            if (mMod?.[1]) releasedPrefixes.add(mMod[1]);
+          }
         }
       }
     }
@@ -847,7 +873,23 @@ function releaseInactiveSessions() {
     db.close();
 
     if (closedCount > 0) {
-      setFlashNotice(`✓ ${closedCount} sesión(es) en desuso archivadas. Solo queda la activa.`);
+      const releasedListStr = Array.from(releasedPrefixes).join(", ") || "cuentas secundarias";
+      setFlashNotice(`✓ ${closedCount} sesión(es) archivadas. Liberadas: [${releasedListStr}]`);
+
+      // Trazabilidad en Engram de la limpieza
+      const engramBin = process.env.LOCALAPPDATA
+        ? path.join(process.env.LOCALAPPDATA, "engram", "bin", "engram.exe")
+        : path.join(os.homedir(), "AppData", "Local", "engram", "bin", "engram.exe");
+      if (fs.existsSync(engramBin)) {
+        try {
+          const title = `Limpieza de sesiones huérfanas: ${engramProject} [${releasedListStr}]`;
+          const content = `**What**: Cierre y archivado limpio de ${closedCount} sesión(es) huérfana(s) en desuso.\n**Cuentas liberadas**: ${releasedListStr}\n**Why**: Deselección manual vía tecla 'd' para liberar pines en HUD y evitar saturación concurrente.\n**Where**: ${sessionData.activeDirectory || process.cwd()}`;
+          execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${engramProject}"`, {
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 4000,
+          });
+        } catch {}
+      }
     } else {
       setFlashNotice("No había sesiones secundarias para liberar.");
     }
@@ -892,15 +934,23 @@ function executeDatabaseMigration(targetPrefix) {
     if (totalMigrated > 0) {
       setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas limpiamente a ${targetPrefix}!`);
 
-      // Snapshot en Engram al Migrar:
+      // Snapshot rico en Engram con contexto ODD / Gentle Shell
       const engramBin = process.env.LOCALAPPDATA
         ? path.join(process.env.LOCALAPPDATA, "engram", "bin", "engram.exe")
         : path.join(os.homedir(), "AppData", "Local", "engram", "bin", "engram.exe");
       if (fs.existsSync(engramBin)) {
         try {
+          let branch = "main";
+          try {
+            branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+          } catch {}
+
+          const filesArray = Array.from(sessionData.attributedChanges.files);
+          const filesStr = filesArray.length > 0 ? filesArray.join(", ") : "sin archivos modificados aún";
           const engramProject = path.basename(sessionData.activeDirectory || process.cwd()).toLowerCase();
-          const title = `Checkpoint migracion: [${migratedFrom.join(", ")}] -> ${targetPrefix}`;
-          const content = `What: Migracion segura entre turnos de ${totalMigrated} sesion(es) desde [${migratedFrom.join(", ")}] hacia ${targetPrefix} por cuota critica.\nWhy: Cuota agotada (>=85% usado) en ${migratedFrom.join(", ")}. Ejecutado en frio (agente en reposo) para evitar fallos de streaming.\nWhere: ${sessionData.activeDirectory || process.cwd()}`;
+
+          const title = `Migración de cuenta: [${migratedFrom.join(", ")}] -> ${targetPrefix} (${branch})`;
+          const content = `**What**: Migración segura entre turnos de ${totalMigrated} sesión(es) desde [${migratedFrom.join(", ")}] hacia ${targetPrefix}.\n**Rama Git**: ${branch}\n**Archivos tocados**: ${filesStr} (+${sessionData.attributedChanges.additions} -${sessionData.attributedChanges.deletions})\n**Why**: Cuota agotada (>=85% usado) en [${migratedFrom.join(", ")}]. Ejecutado en frío para garantizar continuidad sin abortar streaming.\n**Where**: ${sessionData.activeDirectory || process.cwd()}`;
           execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${engramProject}"`, {
             stdio: ["ignore", "pipe", "ignore"],
             timeout: 4000,
@@ -908,7 +958,7 @@ function executeDatabaseMigration(targetPrefix) {
         } catch {}
       }
     } else {
-      setFlashNotice(`No hay sesiones abiertas usando [${criticalList.map(c => c.prefix).join(", ")}].`);
+      setFlashNotice(`No hay sesiones abiertas usando [${criticalList.map((c) => c.prefix).join(", ")}].`);
     }
 
     scheduleRender();
