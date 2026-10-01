@@ -57,6 +57,26 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
 
 ---
 
+## ¿Por qué un HUD independiente y no otra cosa?
+
+La mayoría de las herramientas de telemetría para agentes de código caen en dos recetas conocidas:
+
+1. **Extensiones integradas dentro del proceso:** Parchean la vista interna del editor y comparten su ciclo de vida. Si el agente crashea, se come la memoria o se cuelga con una excepción, la telemetría se apaga con él.
+2. **Proxies con pools ciegos:** Tratan tus credenciales como una granja anónima de tokens. El proxy cambia cuentas en la oscuridad sin saber qué archivo estás tocando, en qué pestaña de la terminal estás parado o si realmente querías quemar esa cuenta en una suite de tests de 20 minutos.
+
+Este proyecto nació porque ninguna de esas dos opciones sirve cuando trabajás con varias pestañas en paralelo y administrás un puñado de cuentas propias.
+
+### Qué hace distinto este HUD
+
+* **Aislamiento de procesos:** El sidebar corre en su propio pane del multiplexor como un script de Node independiente. Lee `opencode.db`, `engram.db` y los archivos de autenticación directo del disco. OpenCode puede reiniciarse, caerse o quedarse sin memoria; la cabina sigue dibujando sin pestañear.
+* **Consciencia de cuentas por pestaña:** En vez de meter todo en una bolsa común, el HUD rastrea qué cuenta está corriendo en qué pane del multiplexor (`▸`). Podés mandar una refactorización pesada con la Cuenta A en la Pestaña 1 mientras hablás con la Cuenta B en la Pestaña 2, sin que se pisen la cuota.
+* **Migración en frío entre turnos (`x`):** Cambiar credenciales a mitad de una petición HTTP rompe el streaming. Si una cuenta supera el 85% de uso mientras el agente está trabajando (`working`), el HUD encola el relevo. La migración recién toca la base de datos cuando el turno pasa a reposo (`idle`), evitando que se te corte una respuesta por la mitad.
+* **Cambios del agente vs. ruido de Git:** Que el árbol de Git esté sucio no significa que lo haya tocado el modelo. El HUD revisa el historial de herramientas para separar el ruido de fondo (compilaciones, archivos temporales) de los archivos que la IA realmente modificó (`✎ agente: N archivos (+X -Y)`).
+* **Ponderación de cuota en dos ventanas:** Mirar solo la ventana de 5 horas es una trampa. Una cuenta puede tener 90% libre en 5 horas pero estar al 3% en su tope semanal. La lógica de selección pondera ambas ventanas (70% en 5h / 30% en semanal) y descarta cuentas a punto de bloquearse por cuota semanal.
+* **Handover de contexto real (`snew` / `sclose`):** Reiniciar una sesión no es solo abrir una terminal en blanco. `/snew` guarda en Engram la rama activa, los archivos modificados y el último estado del agente, archiva la sesión vieja para liberar el candado de la cuenta y abre la pestaña nueva apuntando directo a la cuenta que tenga mayor margen de cuota.
+
+---
+
 ## Technical Architecture & HUD Modules
 
 ### 1. Estado Card
