@@ -762,6 +762,71 @@ function getBestHealthyTargetPrefix() {
   return healthyAccounts[0]?.prefix || accountsList[0]?.prefix || "default";
 }
 
+function releaseInactiveSessions() {
+  const currentSessionId = process.env.OPENCODE_SESSION_ID || null;
+  let closedCount = 0;
+
+  try {
+    const listRaw = execSync("herdr pane list", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const listData = JSON.parse(listRaw);
+    const panes = listData.result?.panes || [];
+
+    // Descubrir qué pane / tab es el que tiene el foco activo del usuario
+    let focusedTabId = null;
+    let focusedPaneId = null;
+    try {
+      const curRaw = execSync("herdr pane current", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const curData = JSON.parse(curRaw);
+      focusedPaneId = curData.result?.pane?.pane_id;
+      focusedTabId = curData.result?.pane?.tab_id;
+    } catch {}
+
+    const focusedPane = panes.find((p) => p.focused || (focusedPaneId && p.pane_id === focusedPaneId));
+    const activeTabId = focusedPane?.tab_id || focusedTabId;
+
+    // Obtener la sesión del pane actualmente en foco o en su tab activo
+    let keepSessionId = focusedPane?.agent_session?.value || null;
+    if (!keepSessionId && activeTabId) {
+      const tabAgentPane = panes.find((p) => p.tab_id === activeTabId && p.agent_session?.value);
+      keepSessionId = tabAgentPane?.agent_session?.value || null;
+    }
+
+    // Si no se detectó por Herdr, proteger la sesión actual donde corre el asistente
+    if (!keepSessionId && currentSessionId) {
+      keepSessionId = currentSessionId;
+    }
+
+    const now = Date.now();
+    const db = new DatabaseSync(OPENCODE_DB_PATH, { open: true });
+
+    // Archivar sesiones huérfanas en la base de datos de OpenCode
+    for (const p of panes) {
+      const sesId = p.agent_session?.value;
+      if (sesId && sesId !== keepSessionId) {
+        const s = db.prepare("SELECT time_archived FROM session_v2 WHERE id = ?").get(sesId);
+        if (s && !s.time_archived) {
+          db.prepare("UPDATE session_v2 SET time_archived = ? WHERE id = ?").run(now, sesId);
+          closedCount++;
+        }
+      }
+    }
+
+    db.close();
+
+    if (closedCount > 0) {
+      setFlashNotice(`✓ ${closedCount} sesión(es) en desuso archivadas. Solo queda la activa.`);
+    } else {
+      setFlashNotice("No había sesiones secundarias para liberar.");
+    }
+
+    scheduleRender();
+  } catch (err) {
+    setFlashNotice(`[error] Error al liberar sesiones: ${err.message}`);
+  }
+
+  return closedCount;
+}
+
 function migrateCriticalSessions() {
   const sessionData = getOpenCodeSessionData();
   const activePrefixes = sessionData.allActivePrefixes;
@@ -1148,8 +1213,8 @@ function render() {
   const hasCritical = accountsList.some((a) => a.isCritical || a.used5h >= 85);
   const targetHealthy = getBestHealthyTargetPrefix();
   const shortcutHint = hasCritical
-    ? `${TEXT_DIM} r: actualizar · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
-    : `${TEXT_DIM} r: actualizar todo · q: salir · 2m · ${lastUpdatedTime || "en vivo"}${RESET}`;
+    ? `${TEXT_DIM} r: actualizar · d: deseleccionar · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
+    : `${TEXT_DIM} r: actualizar · d: deseleccionar · q: salir · 2m · ${lastUpdatedTime || "en vivo"}${RESET}`;
   lines.push(shortcutHint);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
@@ -1175,6 +1240,8 @@ if (process.stdin.isTTY) {
       cleanupAndExit();
     } else if (key === "r" || key === "R") {
       fetchQuotas(true); // Forzar actualización de TODAS las 5 cuentas bajo demanda
+    } else if (key === "d" || key === "D") {
+      releaseInactiveSessions(); // Deseleccionar/archivar sesiones huérfanas en desuso
     } else if (key === "x" || key === "X") {
       migrateCriticalSessions(); // Migrar automáticamente sesiones con cuenta crítica
     } else if (key === "\u001b[A" || key === "k") {
