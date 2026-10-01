@@ -79,6 +79,7 @@ let scrollOffset = 0;
 let renderTimer = null;
 let flashNotice = null;
 let flashNoticeTimer = null;
+let pendingMigrationTarget = null; // Encolado para cuando el turno pase a idle
 
 // ============================================================================
 // MOTOR DE MEDICION UNICODE A PRUEBA DE DESBORDES (ZERO-WRAPPING)
@@ -323,6 +324,12 @@ function getOpenCodeSessionData() {
     activeDirectory: process.cwd(),
     allActivePrefixes: new Set(),
     lastUpdatedTurn: 0,
+    agentStatus: "idle", // 'working' | 'idle' estilo petal de gentle-shell
+    attributedChanges: {
+      files: new Set(),
+      additions: 0,
+      deletions: 0,
+    },
   };
 
   try {
@@ -377,6 +384,9 @@ function getOpenCodeSessionData() {
       const primaryPane = siblingPane || focusedPane || workingPane;
       if (primaryPane?.agent_session?.value) {
         targetSession = db.prepare("SELECT * FROM session_v2 WHERE id = ?").get(primaryPane.agent_session.value);
+        if (primaryPane.agent_status) {
+          result.agentStatus = primaryPane.agent_status;
+        }
       }
     } catch {}
 
@@ -439,7 +449,7 @@ function getOpenCodeSessionData() {
         }
       } catch {}
 
-      // Conteo de herramientas ejecutadas
+      // Conteo de herramientas ejecutadas y Gentle Attributed Changes
       const rows = db.prepare(`
         SELECT data FROM session_message 
         WHERE session_id = ? AND type = 'assistant'
@@ -454,7 +464,21 @@ function getOpenCodeSessionData() {
                 result.tools.total++;
                 const name = (p.toolName || p.name || "").toLowerCase();
                 if (name === "read") result.tools.read++;
-                else if (name === "write" || name === "edit") result.tools.write++;
+                else if (name === "write" || name === "edit") {
+                  result.tools.write++;
+                  // Captura de archivos y deltas atribuidos a la sesión
+                  const filePath = p.state?.input?.path || p.input?.path || p.input?.filePath || p.arguments?.path || p.arguments?.filePath;
+                  if (filePath) {
+                    result.attributedChanges.files.add(path.basename(filePath));
+                  }
+                  if (Array.isArray(p.state?.metadata?.files)) {
+                    for (const mf of p.state.metadata.files) {
+                      if (mf.file) result.attributedChanges.files.add(path.basename(mf.file));
+                      if (typeof mf.additions === "number") result.attributedChanges.additions += mf.additions;
+                      if (typeof mf.deletions === "number") result.attributedChanges.deletions += mf.deletions;
+                    }
+                  }
+                }
                 else if (name === "shell" || name === "bash") result.tools.bash++;
                 else if (name.startsWith("mem_") || name === "engram" || name === "execute") result.tools.engram++;
                 else result.tools.other++;
@@ -735,6 +759,15 @@ function scheduleRender() {
 // Comprobación de turnos locales reactiva cada 3s (sin consumo de red externa)
 function checkLocalActivity() {
   const sessionData = getOpenCodeSessionData();
+
+  // Si había una migración encolada y el agente pasó a 'idle', ejecutarla en frío
+  if (pendingMigrationTarget && sessionData.agentStatus !== "working") {
+    const target = pendingMigrationTarget;
+    pendingMigrationTarget = null;
+    executeDatabaseMigration(target);
+    return;
+  }
+
   if (sessionData.lastUpdatedTurn > 0) {
     if (lastKnownTurnTime > 0 && sessionData.lastUpdatedTurn > lastKnownTurnTime) {
       // El asistente completó un turno: refrescamos la cuenta activa inmediatamente
@@ -827,17 +860,11 @@ function releaseInactiveSessions() {
   return closedCount;
 }
 
-function migrateCriticalSessions() {
+function executeDatabaseMigration(targetPrefix) {
   const sessionData = getOpenCodeSessionData();
-  const activePrefixes = sessionData.allActivePrefixes;
-
   const criticalList = accountsList.filter((a) => a.isCritical || (a.used5h >= 85 && !a.hasError));
-  if (criticalList.length === 0) {
-    setFlashNotice("No hay cuentas en estado crítico para migrar.");
-    return 0;
-  }
+  if (criticalList.length === 0) return 0;
 
-  const targetPrefix = getBestHealthyTargetPrefix();
   let totalMigrated = 0;
   const migratedFrom = [];
 
@@ -863,7 +890,7 @@ function migrateCriticalSessions() {
     db.close();
 
     if (totalMigrated > 0) {
-      setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas de [${migratedFrom.join(", ")}] a ${targetPrefix}!`);
+      setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas limpiamente a ${targetPrefix}!`);
 
       // Snapshot en Engram al Migrar:
       const engramBin = process.env.LOCALAPPDATA
@@ -873,7 +900,7 @@ function migrateCriticalSessions() {
         try {
           const engramProject = path.basename(sessionData.activeDirectory || process.cwd()).toLowerCase();
           const title = `Checkpoint migracion: [${migratedFrom.join(", ")}] -> ${targetPrefix}`;
-          const content = `What: Migracion automatica de ${totalMigrated} sesion(es) abiertas desde [${migratedFrom.join(", ")}] hacia ${targetPrefix} por cuota critica.\nWhy: Cuota agotada (>=85% usado) en ${migratedFrom.join(", ")}. Se reasigno para continuar el trabajo sin errores de cuota.\nWhere: ${sessionData.activeDirectory || process.cwd()}`;
+          const content = `What: Migracion segura entre turnos de ${totalMigrated} sesion(es) desde [${migratedFrom.join(", ")}] hacia ${targetPrefix} por cuota critica.\nWhy: Cuota agotada (>=85% usado) en ${migratedFrom.join(", ")}. Ejecutado en frio (agente en reposo) para evitar fallos de streaming.\nWhere: ${sessionData.activeDirectory || process.cwd()}`;
           execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${engramProject}"`, {
             stdio: ["ignore", "pipe", "ignore"],
             timeout: 4000,
@@ -890,6 +917,27 @@ function migrateCriticalSessions() {
   }
 
   return totalMigrated;
+}
+
+function migrateCriticalSessions() {
+  const sessionData = getOpenCodeSessionData();
+
+  const criticalList = accountsList.filter((a) => a.isCritical || (a.used5h >= 85 && !a.hasError));
+  if (criticalList.length === 0) {
+    setFlashNotice("No hay cuentas en estado crítico para migrar.");
+    return 0;
+  }
+
+  const targetPrefix = getBestHealthyTargetPrefix();
+
+  // Si el agente está en pleno streaming / working, encolar para no matar el turno
+  if (sessionData.agentStatus === "working") {
+    pendingMigrationTarget = targetPrefix;
+    setFlashNotice(`⏳ Agente trabajando: rotación a ${targetPrefix} programada para el final del turno.`, 6000);
+    return 0;
+  }
+
+  return executeDatabaseMigration(targetPrefix);
 }
 
 function setFlashNotice(msg, durationMs = 4000) {
@@ -987,8 +1035,12 @@ function render() {
   const bannerPad = Math.max(0, Math.floor((width - stringWidth(bannerRaw)) / 2));
   lines.push(`${" ".repeat(bannerPad)}${bannerLeft} ${bannerRight}`);
 
-  // 2. ✿ Estado Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET}`));
+  // 2. ✿ Estado Card (con Indicador Petal / Working State de Gentle-Shell)
+  const isWorking = opencode.agentStatus === "working";
+  const petalIndicator = isWorking
+    ? `${BOLD}${AMBER}◐ WORKING${RESET}`
+    : `${TEXT_DIM}○ idle${RESET}`;
+  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET} ${TEXT_DIM}·${RESET} ${petalIndicator}`));
   const shortProject = folder.length > 20 ? folder.slice(0, 18) + "…" : folder;
   lines.push(drawRow(`${GOLD}Proyecto${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
   const dirtyBadge = git.isClean ? `${MINT}limpio${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
@@ -1119,10 +1171,16 @@ function render() {
       lines.push(drawRow(`${BOLD}${MINT}${flashNotice}${RESET}`));
     }
     const targetHealthy = getBestHealthyTargetPrefix();
+    if (pendingMigrationTarget) {
+      lines.push(drawRow(`${BOLD}${AMBER}⏳ Rotación a ${pendingMigrationTarget} programada al terminar turno${RESET}`));
+    }
     for (const ca of alertAccounts) {
       const isThisActive = activePrefixes.has(ca.prefix.toLowerCase());
       if (ca.isCritical) {
-        lines.push(drawRow(`${BOLD}${CORAL}! CRÍTICO: ${ca.prefix} [presioná 'x' -> migrar a ${targetHealthy}]${RESET}`));
+        const actionLabel = opencode.agentStatus === "working"
+          ? `[presioná 'x' -> programar a ${targetHealthy}]`
+          : `[presioná 'x' -> migrar a ${targetHealthy}]`;
+        lines.push(drawRow(`${BOLD}${CORAL}! CRÍTICO: ${ca.prefix} ${actionLabel}${RESET}`));
       } else {
         const activeTag = isThisActive ? " (activa) - considerar rotar" : "";
         lines.push(drawRow(`${AMBER}! AVISO 70%: ${ca.prefix} al ${ca.used5h}% usado (queda ${ca.rem5h}%)${activeTag}${RESET}`));
@@ -1159,8 +1217,13 @@ function render() {
     }
   }
 
-  // 6. ᛦ Gráfico Git Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}gráfico git${RESET}`));
+  // 6. ᛦ Gráfico Git & Gentle Attributed Changes Card
+  const agentFilesCount = opencode.attributedChanges.files.size;
+  const agentChangesTitle = agentFilesCount > 0
+    ? `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}cambios${RESET} ${TEXT_DIM}· ${agentFilesCount} por agente${RESET}`
+    : `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}git y cambios${RESET}`;
+  lines.push(drawTop(agentChangesTitle));
+
   const gitBadges = git.isClean
     ? `${MINT}✔ limpio${RESET}`
     : `${AMBER}● ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
@@ -1174,11 +1237,17 @@ function render() {
     lines.push(drawRow(`${TEXT_DIM}* (sin commits recientes)${RESET}`));
   }
 
+  // Desglose dual: Git Working Tree vs Attributed Changes de Gentle-Shell
   const totalDiffFiles = git.modified + git.staged;
   const changesSummary = totalDiffFiles > 0
-    ? `${ACCENT_PRIMARY}✎${RESET} ${TEXT_PRIMARY}${totalDiffFiles} archivos${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
-    : `${ACCENT_PRIMARY}✎${RESET} ${TEXT_DIM}0 archivos · limpio${RESET}`;
-  lines.push(drawRow(changesSummary, `${TEXT_DIM}/gentle:changes${RESET}`));
+    ? `${TEXT_DIM}git:${RESET} ${TEXT_PRIMARY}${totalDiffFiles} archivos${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
+    : `${TEXT_DIM}git:${RESET} ${MINT}limpio${RESET}`;
+
+  const agentSummary = agentFilesCount > 0
+    ? `${ACCENT_PRIMARY}✎ agente:${RESET} ${MINT}${agentFilesCount} archivos${RESET} ${TEXT_DIM}(+${opencode.attributedChanges.additions} -${opencode.attributedChanges.deletions})${RESET}`
+    : `${ACCENT_PRIMARY}✎ agente:${RESET} ${TEXT_DIM}0 archivos${RESET}`;
+
+  lines.push(drawRow(changesSummary, agentSummary));
   lines.push(drawBottom());
 
   // 7. Herramientas Telemetry Card
