@@ -19,7 +19,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 // ============================================================================
@@ -970,19 +970,19 @@ function executeDatabaseMigration(targetPrefix) {
           // Notificar en vivo al servidor de OpenCode mediante su API HTTP
           // Esto actualiza el agente y modelo en memoria y emite agent-switched / model-switched al TUI
           try {
-            execSync(`opencode api post /api/session/${ses.id}/agent -d "${JSON.stringify({ agent: toAgent }).replace(/"/g, '\\"')}"`, {
-              stdio: ["ignore", "pipe", "ignore"],
-              timeout: 3000,
-              shell: true
-            });
+            execFileSync(
+              "cmd.exe",
+              ["/c", "opencode", "api", "post", `/api/session/${ses.id}/agent`, "-d", JSON.stringify({ agent: toAgent })],
+              { stdio: ["ignore", "pipe", "ignore"], timeout: 4000, encoding: "utf8" }
+            );
           } catch {}
 
           try {
-            execSync(`opencode api post /api/session/${ses.id}/model -d "${JSON.stringify({ model: toModelObj }).replace(/"/g, '\\"')}"`, {
-              stdio: ["ignore", "pipe", "ignore"],
-              timeout: 3000,
-              shell: true
-            });
+            execFileSync(
+              "cmd.exe",
+              ["/c", "opencode", "api", "post", `/api/session/${ses.id}/model`, "-d", JSON.stringify({ model: toModelObj })],
+              { stdio: ["ignore", "pipe", "ignore"], timeout: 4000, encoding: "utf8" }
+            );
           } catch {}
         }
       }
