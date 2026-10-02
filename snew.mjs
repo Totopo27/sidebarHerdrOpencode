@@ -19,7 +19,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 // Colores ANSI
@@ -148,10 +148,15 @@ if (fs.existsSync(engramBin)) {
 
     const content = `**What**: Handover automatico y creacion de sesion limpia via snew.\n**Rama Git**: ${branch}\n**Cuenta saliente**: ${outgoingContext.accountPrefix}\n**Archivos tocados**: ${filesListStr}${snippetStr}\n**Where**: ${cwd}`;
 
-    execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${projectName}"`, {
-      stdio: ["ignore", "pipe", "ignore"],
-      timeout: 4000,
-    });
+    execFileSync(engramBin, [
+      "save",
+      title,
+      content,
+      "--type",
+      "decision",
+      "--project",
+      projectName,
+    ]);
     console.log(`  ${MINT}✓${RESET} Contexto de Handover registrado en Engram (${outgoingContext.attributedFiles.length} archivos atribuidos).`);
   } catch {}
 }

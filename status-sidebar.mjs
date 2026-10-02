@@ -64,8 +64,21 @@ const QUOTA_URL = "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQu
 const USER_AGENT = "antigravity/cli/1.0.13 (aidev_client; os_type=darwin; arch=arm64)";
 const POLL_INTERVAL_MS = 120_000; // 2 minutos para el sondeo pasivo
 
+function resolveEngramDbPath() {
+  const candidates = [
+    process.env.ENGRAM_DATA_DIR ? path.join(process.env.ENGRAM_DATA_DIR, "engram.db") : null,
+    "D:/.engram/engram.db",
+    "C:/.engram/engram.db",
+    path.join(os.homedir(), ".engram", "engram.db"),
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return path.join(os.homedir(), ".engram", "engram.db");
+}
+
 const OPENCODE_DB_PATH = path.join(os.homedir(), ".local/share/opencode/opencode.db");
-const ENGRAM_DB_PATH = path.join(os.homedir(), ".engram/engram.db");
+const ENGRAM_DB_PATH = resolveEngramDbPath();
 
 // ============================================================================
 // ESTADO GLOBAL & CACHE
@@ -884,10 +897,15 @@ function releaseInactiveSessions() {
         try {
           const title = `Limpieza de sesiones huérfanas: ${engramProject} [${releasedListStr}]`;
           const content = `**What**: Cierre y archivado limpio de ${closedCount} sesión(es) huérfana(s) en desuso.\n**Cuentas liberadas**: ${releasedListStr}\n**Why**: Deselección manual vía tecla 'd' para liberar pines en HUD y evitar saturación concurrente.\n**Where**: ${sessionData.activeDirectory || process.cwd()}`;
-          execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${engramProject}"`, {
-            stdio: ["ignore", "pipe", "ignore"],
-            timeout: 4000,
-          });
+          execFileSync(engramBin, [
+            "save",
+            title,
+            content,
+            "--type",
+            "decision",
+            "--project",
+            engramProject,
+          ]);
         } catch {}
       }
     } else {
