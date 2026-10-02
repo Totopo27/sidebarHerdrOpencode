@@ -323,6 +323,52 @@ function colorizeGitGraphLine(line) {
   return `${graphPart} ${hash}${refs}${subject}`;
 }
 
+// ============================================================================
+// RESOLUCION DE PREFIJOS DE CUENTA (MULTI-MODEL / JSON COMPLIANT)
+// ============================================================================
+function extractAccountPrefix(agentStr, modelStr) {
+  // 1. Del agente (ej: sdd-orchestrator-xen1, sdd-apply-gianni, etc.)
+  if (agentStr) {
+    const m = (agentStr || "").match(/sdd-[a-z0-9]+-([a-z0-9_-]+)/i);
+    if (m?.[1]) return m[1].toLowerCase();
+
+    const lowerAgent = agentStr.toLowerCase();
+    for (const acc of accountsList) {
+      if (lowerAgent.includes(acc.prefix.toLowerCase())) {
+        return acc.prefix.toLowerCase();
+      }
+    }
+  }
+
+  // 2. Del modelo (ej: {"id":"xen1/gemini-3.8-flash-high"}, "xen1/...", "cliproxy/xen1/...")
+  if (modelStr) {
+    let modelId = String(modelStr);
+    try {
+      const parsed = JSON.parse(modelStr);
+      if (parsed.id) modelId = parsed.id;
+    } catch {}
+
+    const lowerModel = modelId.toLowerCase();
+    const mMod = lowerModel.match(/(?:^|[/"'\\\\])([a-z0-9_-]+)\/(?:gemini|claude|antigravity|[a-z0-9.-]+)/i);
+    if (mMod?.[1]) {
+      const candidate = mMod[1].toLowerCase();
+      if (candidate !== "cliproxy" && candidate !== "opencode") {
+        return candidate;
+      }
+    }
+
+    for (const acc of accountsList) {
+      const pfx = acc.prefix.toLowerCase();
+      const re = new RegExp(`(?:^|[/"'\\\\])${pfx}(?:[/_-]|$)`, "i");
+      if (re.test(lowerModel)) {
+        return pfx;
+      }
+    }
+  }
+
+  return null;
+}
+
 // 2. OpenCode Session, Context, Multi-Pane Herdr & Tool Telemetry
 function getOpenCodeSessionData() {
   const result = {
@@ -377,13 +423,18 @@ function getOpenCodeSessionData() {
         const sesId = p.agent_session?.value;
         if (sesId) {
           const s = db.prepare("SELECT agent, model, time_archived, time_updated FROM session_v2 WHERE id = ?").get(sesId);
-          if (s && !s.time_archived) {
-            const m = (s.agent || "").match(/sdd-orchestrator-([a-z0-9_-]+)/i);
-            if (m?.[1]) {
-              result.allActivePrefixes.add(m[1].toLowerCase());
-            } else if (s.model) {
-              const mMod = String(s.model).match(/([a-z0-9_-]+)\/gemini/i);
-              if (mMod?.[1]) result.allActivePrefixes.add(mMod[1].toLowerCase());
+          if (s) {
+            // Una sesión en un pane de Herdr se considera activa si:
+            // 1. time_archived es null (nunca archivada)
+            // 2. Tuvo actividad posterior a cuando se archivó (time_updated > time_archived)
+            // 3. El agente está trabajando en este momento (p.agent_status === 'working')
+            // 4. O es el tab/espacio local donde estamos parados
+            const isAlive = !s.time_archived || (s.time_updated && s.time_updated > s.time_archived) || p.agent_status === "working" || (myTabId && p.tab_id === myTabId);
+            if (isAlive) {
+              const pfx = extractAccountPrefix(s.agent, s.model);
+              if (pfx) {
+                result.allActivePrefixes.add(pfx);
+              }
             }
           }
         }
@@ -403,19 +454,18 @@ function getOpenCodeSessionData() {
       }
     } catch {}
 
-    // B. Fallback: sesión no archivada que coincida con el directorio actual (cwd)
+    // B. Fallback: sesión que coincida con el directorio actual (cwd)
     if (!targetSession) {
       const normalizedCwd = cwd.replace(/\\/g, "/");
       targetSession = db.prepare(`
         SELECT * FROM session_v2 
-        WHERE (directory = ? OR directory = ?) AND time_archived IS NULL 
+        WHERE (directory = ? OR directory = ?)
         ORDER BY time_updated DESC LIMIT 1
       `).get(cwd, normalizedCwd);
 
       if (!targetSession) {
         targetSession = db.prepare(`
           SELECT * FROM session_v2 
-          WHERE time_archived IS NULL 
           ORDER BY time_updated DESC LIMIT 1
         `).get();
       }
@@ -429,9 +479,10 @@ function getOpenCodeSessionData() {
       result.cost = targetSession.cost || 0;
       result.lastUpdatedTurn = targetSession.time_updated || 0;
 
-      const pfxMatch = (targetSession.agent || "").match(/sdd-orchestrator-([a-z0-9_-]+)/i);
-      if (pfxMatch?.[1]) {
-        result.allActivePrefixes.add(pfxMatch[1].toLowerCase());
+      // Asegurar que la cuenta del espacio local SIEMPRE esté registrada como activa
+      const localPfx = extractAccountPrefix(targetSession.agent, targetSession.model);
+      if (localPfx) {
+        result.allActivePrefixes.add(localPfx);
       }
 
       if (targetSession.model) {
@@ -867,18 +918,13 @@ function releaseInactiveSessions() {
     for (const p of panes) {
       const sesId = p.agent_session?.value;
       if (sesId && sesId !== keepSessionId) {
-        const s = db.prepare("SELECT agent, model, time_archived FROM session_v2 WHERE id = ?").get(sesId);
-        if (s && !s.time_archived) {
+        const s = db.prepare("SELECT agent, model, time_archived, time_updated FROM session_v2 WHERE id = ?").get(sesId);
+        if (s) {
           db.prepare("UPDATE session_v2 SET time_archived = ? WHERE id = ?").run(now, sesId);
           closedCount++;
 
-          const mAgent = (s.agent || "").match(/sdd-orchestrator-([a-z0-9_-]+)/i);
-          if (mAgent?.[1]) {
-            releasedPrefixes.add(mAgent[1]);
-          } else if (s.model) {
-            const mMod = String(s.model).match(/([a-z0-9_-]+)\/gemini/i);
-            if (mMod?.[1]) releasedPrefixes.add(mMod[1]);
-          }
+          const pfx = extractAccountPrefix(s.agent, s.model);
+          if (pfx) releasedPrefixes.add(pfx);
         }
       }
     }
