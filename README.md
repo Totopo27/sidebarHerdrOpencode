@@ -178,14 +178,28 @@ The orchestrator recognizes the following phrases to execute the session close w
 
 ---
 
+## Ecosystem & Foundation Repositories
+
+This sidebar is not a standalone mock; it is a cockpit operating directly on top of specific services and tools. Without the following repositories and services running in your environment, the HUD has no data to display or runtime to dock into:
+
+| Component | Repository | Role in this HUD |
+|---|---|---|
+| **CPAMC** | [router-for-me/Cli-Proxy-API-Management-Center](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) | Web UI for CLIProxyAPI. Manages OAuth logins and generates the credentials inspected by the sidebar. |
+| **CLIProxyAPI** | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | Local proxy service (port `8317`). Powers multi-account routing, quota inspection endpoints, and auth storage (`~/.cliproxy/auths`). |
+| **Herdr** | [herdrdev/herdr](https://github.com/herdrdev/herdr) | Terminal multiplexer runtime. Hosts the sidebar split (0.74 / 0.26 ratio) via `herdr pane list` and `herdr pane current`. |
+| **OpenCode** | [OpenCode](https://github.com/opencode-ai/opencode) | Coding agent runtime. The sidebar queries `~/.local/share/opencode/opencode.db` directly to monitor sessions, context windows, and tools. |
+| **Engram** | [Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram) | Persistent memory daemon (port `7437`). Provides cross-session observations, project namespace tracking, and session sync. |
+
+---
+
 ## Installation & Setup
 
 ### Prerequisites
 - **Node.js >= 22.0.0** (native `node:sqlite` support).
-- **Herdr** (terminal multiplexer).
-- **OpenCode** (SQLite database located at `~/.local/share/opencode/opencode.db`).
-- **CLIProxyAPI** (running at `http://127.0.0.1:8317`).
-- **Engram** (persistent memory daemon at `http://127.0.0.1:7437`).
+- **Herdr** running as your terminal multiplexer.
+- **OpenCode** with its SQLite database at `~/.local/share/opencode/opencode.db`.
+- **CLIProxyAPI** (running at `http://127.0.0.1:8317`) with OAuth tokens managed via **CPAMC**.
+- **Engram** daemon running at `http://127.0.0.1:7437`.
 
 ### Repository File Structure
 ```text

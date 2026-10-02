@@ -913,26 +913,65 @@ function executeDatabaseMigration(targetPrefix) {
   try {
     const db = new DatabaseSync(OPENCODE_DB_PATH, { open: true });
     const toAgent = `sdd-orchestrator-${targetPrefix}`;
-    const toModel = JSON.stringify({ id: `${targetPrefix}/gemini-3.8-flash-high`, providerID: "cliproxy" });
+    const toModelObj = { id: `${targetPrefix}/gemini-3.8-flash-high`, providerID: "cliproxy" };
+    const toModel = JSON.stringify(toModelObj);
+
+    // 1. Obtener todas las sesiones activas en SQLite o en panes de Herdr
+    const activeSessions = db.prepare(`
+      SELECT id, agent, model, directory FROM session_v2 
+      WHERE time_archived IS NULL
+    `).all();
 
     for (const ca of criticalList) {
       const fromAgent = `sdd-orchestrator-${ca.prefix}`;
-      const res = db.prepare(`
-        UPDATE session_v2 
-        SET agent = ?, model = ? 
-        WHERE agent = ? AND time_archived IS NULL
-      `).run(toAgent, toModel, fromAgent);
+      const sessionsToMigrate = activeSessions.filter((s) => {
+        if (s.agent === fromAgent) return true;
+        const m = (s.agent || "").match(/sdd-orchestrator-([a-z0-9_-]+)/i);
+        if (m?.[1] && m[1].toLowerCase() === ca.prefix.toLowerCase()) return true;
+        if (s.model) {
+          const mMod = String(s.model).match(/([a-z0-9_-]+)\/gemini/i);
+          if (mMod?.[1] && mMod[1].toLowerCase() === ca.prefix.toLowerCase()) return true;
+        }
+        return false;
+      });
 
-      if (res.changes > 0) {
-        totalMigrated += res.changes;
-        migratedFrom.push(ca.prefix);
+      for (const ses of sessionsToMigrate) {
+        // Actualizar en SQLite
+        const res = db.prepare(`
+          UPDATE session_v2 
+          SET agent = ?, model = ? 
+          WHERE id = ?
+        `).run(toAgent, toModel, ses.id);
+
+        if (res.changes > 0) {
+          totalMigrated += res.changes;
+          if (!migratedFrom.includes(ca.prefix)) migratedFrom.push(ca.prefix);
+
+          // Notificar en vivo al servidor de OpenCode mediante su API HTTP
+          // Esto actualiza el agente y modelo en memoria y emite agent-switched / model-switched al TUI
+          try {
+            execSync(`opencode api post /api/session/${ses.id}/agent -d "${JSON.stringify({ agent: toAgent }).replace(/"/g, '\\"')}"`, {
+              stdio: ["ignore", "pipe", "ignore"],
+              timeout: 3000,
+              shell: true
+            });
+          } catch {}
+
+          try {
+            execSync(`opencode api post /api/session/${ses.id}/model -d "${JSON.stringify({ model: toModelObj }).replace(/"/g, '\\"')}"`, {
+              stdio: ["ignore", "pipe", "ignore"],
+              timeout: 3000,
+              shell: true
+            });
+          } catch {}
+        }
       }
     }
 
     db.close();
 
     if (totalMigrated > 0) {
-      setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas limpiamente a ${targetPrefix}!`);
+      setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas en vivo a ${targetPrefix}!`);
 
       // Snapshot rico en Engram con contexto ODD / Gentle Shell
       const engramBin = process.env.LOCALAPPDATA
