@@ -916,11 +916,31 @@ function executeDatabaseMigration(targetPrefix) {
     const toModelObj = { id: `${targetPrefix}/gemini-3.8-flash-high`, providerID: "cliproxy" };
     const toModel = JSON.stringify(toModelObj);
 
-    // 1. Obtener todas las sesiones activas en SQLite o en panes de Herdr
-    const activeSessions = db.prepare(`
+    // 1. Obtener sesiones objetivo: tanto las no archivadas en DB como las que están abiertas en panes vivos de Herdr
+    const activeSessionsMap = new Map();
+    
+    // De la DB (no archivadas)
+    const dbSessions = db.prepare(`
       SELECT id, agent, model, directory FROM session_v2 
       WHERE time_archived IS NULL
     `).all();
+    for (const s of dbSessions) activeSessionsMap.set(s.id, s);
+
+    // De los panes activos de Herdr (incluso si fueron marcadas como archived en DB por un cierre previo)
+    try {
+      const listRaw = execSync("herdr pane list", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+      const listData = JSON.parse(listRaw);
+      const panes = listData.result?.panes || [];
+      for (const p of panes) {
+        const sesId = p.agent_session?.value;
+        if (sesId && !activeSessionsMap.has(sesId)) {
+          const s = db.prepare("SELECT id, agent, model, directory FROM session_v2 WHERE id = ?").get(sesId);
+          if (s) activeSessionsMap.set(s.id, s);
+        }
+      }
+    } catch {}
+
+    const activeSessions = Array.from(activeSessionsMap.values());
 
     for (const ca of criticalList) {
       const fromAgent = `sdd-orchestrator-${ca.prefix}`;
