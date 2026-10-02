@@ -993,7 +993,7 @@ function executeDatabaseMigration(targetPrefix) {
     if (totalMigrated > 0) {
       setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas en vivo a ${targetPrefix}!`);
 
-      // Snapshot rico en Engram con contexto ODD / Gentle Shell
+      // Snapshot rico en Engram con contexto ODD / Gentle Shell / Checkpoint
       const engramBin = process.env.LOCALAPPDATA
         ? path.join(process.env.LOCALAPPDATA, "engram", "bin", "engram.exe")
         : path.join(os.homedir(), "AppData", "Local", "engram", "bin", "engram.exe");
@@ -1008,12 +1008,37 @@ function executeDatabaseMigration(targetPrefix) {
           const filesStr = filesArray.length > 0 ? filesArray.join(", ") : "sin archivos modificados aún";
           const engramProject = path.basename(sessionData.activeDirectory || process.cwd()).toLowerCase();
 
-          const title = `Migración de cuenta: [${migratedFrom.join(", ")}] -> ${targetPrefix} (${branch})`;
-          const content = `**What**: Migración segura entre turnos de ${totalMigrated} sesión(es) desde [${migratedFrom.join(", ")}] hacia ${targetPrefix}.\n**Rama Git**: ${branch}\n**Archivos tocados**: ${filesStr} (+${sessionData.attributedChanges.additions} -${sessionData.attributedChanges.deletions})\n**Why**: Cuota agotada (>=85% usado) en [${migratedFrom.join(", ")}]. Ejecutado en frío para garantizar continuidad sin abortar streaming.\n**Where**: ${sessionData.activeDirectory || process.cwd()}`;
-          execSync(`"${engramBin}" save "${title}" "${content}" --type decision --project "${engramProject}"`, {
-            stdio: ["ignore", "pipe", "ignore"],
-            timeout: 4000,
-          });
+          // Extraer último estado / snippet del turno para checkpointing estilo Gentle Shell
+          let lastSnippet = "";
+          try {
+            const dbCheck = new DatabaseSync(OPENCODE_DB_PATH, { open: true });
+            const lastAssistantMsg = dbCheck.prepare(`
+              SELECT data FROM session_message 
+              WHERE type = 'assistant'
+              ORDER BY time_created DESC LIMIT 1
+            `).get();
+            if (lastAssistantMsg?.data) {
+              const d = JSON.parse(lastAssistantMsg.data);
+              const txt = (d.content || []).find((c) => c && c.type === "text")?.text;
+              if (txt) {
+                lastSnippet = `\n**Último estado**: ${txt.trim().split("\n")[0].slice(0, 150)}`;
+              }
+            }
+            dbCheck.close();
+          } catch {}
+
+          const title = `Checkpoint migración: [${migratedFrom.join(", ")}] -> ${targetPrefix} (${branch})`;
+          const content = `**What**: Checkpoint y rotación en frío de ${totalMigrated} sesión(es) desde [${migratedFrom.join(", ")}] hacia ${targetPrefix}.\n**Rama Git**: ${branch}\n**Archivos tocados**: ${filesStr} (+${sessionData.attributedChanges.additions} -${sessionData.attributedChanges.deletions})${lastSnippet}\n**Why**: Cuota crítica agotada (>=85% usado) en cuenta(s) saliente(s).\n**Where**: ${sessionData.activeDirectory || process.cwd()}`;
+
+          execFileSync(engramBin, [
+            "save",
+            title,
+            content,
+            "--type",
+            "decision",
+            "--project",
+            engramProject,
+          ]);
         } catch {}
       }
     } else {
