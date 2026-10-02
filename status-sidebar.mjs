@@ -1030,10 +1030,14 @@ function executeDatabaseMigration(targetPrefix) {
 
 function migrateCriticalSessions() {
   const sessionData = getOpenCodeSessionData();
+  const activePrefixes = sessionData.allActivePrefixes;
 
-  const criticalList = accountsList.filter((a) => a.isCritical || (a.used5h >= 85 && !a.hasError));
+  // Solo considerar cuentas críticas o al 85%+ que estén ACTIVAS en alguna sesión
+  const criticalList = accountsList.filter(
+    (a) => (a.isCritical || (a.used5h >= 85 && !a.hasError)) && activePrefixes.has(a.prefix.toLowerCase())
+  );
   if (criticalList.length === 0) {
-    setFlashNotice("No hay cuentas en estado crítico para migrar.");
+    setFlashNotice("No hay sesiones activas usando cuentas críticas.");
     return 0;
   }
 
@@ -1272,8 +1276,8 @@ function render() {
     }
   }
 
-  // Notificaciones de alerta si alguna cuenta llega a 70%+ de uso
-  const alertAccounts = accountsList.filter((a) => (a.isCritical || a.isWarning) && !a.hasError);
+  // Notificaciones de alerta: solo si una cuenta crítica/aviso está REALMENTE ACTIVA en alguna sesión abierta
+  const alertAccounts = accountsList.filter((a) => (a.isCritical || a.isWarning) && !a.hasError && activePrefixes.has(a.prefix.toLowerCase()));
   if (flashNotice || alertAccounts.length > 0) {
     lines.push(drawDivider());
     if (flashNotice) {
@@ -1284,15 +1288,13 @@ function render() {
       lines.push(drawRow(`${BOLD}${AMBER}⏳ Rotación a ${pendingMigrationTarget} programada al terminar turno${RESET}`));
     }
     for (const ca of alertAccounts) {
-      const isThisActive = activePrefixes.has(ca.prefix.toLowerCase());
       if (ca.isCritical) {
         const actionLabel = opencode.agentStatus === "working"
           ? `[presioná 'x' -> programar a ${targetHealthy}]`
           : `[presioná 'x' -> migrar a ${targetHealthy}]`;
-        lines.push(drawRow(`${BOLD}${CORAL}! CRÍTICO: ${ca.prefix} ${actionLabel}${RESET}`));
+        lines.push(drawRow(`${BOLD}${CORAL}! CRÍTICO: ${ca.prefix} (activa) ${actionLabel}${RESET}`));
       } else {
-        const activeTag = isThisActive ? " (activa) - considerar rotar" : "";
-        lines.push(drawRow(`${AMBER}! AVISO 70%: ${ca.prefix} al ${ca.used5h}% usado (queda ${ca.rem5h}%)${activeTag}${RESET}`));
+        lines.push(drawRow(`${AMBER}! AVISO 70%: ${ca.prefix} al ${ca.used5h}% usado (queda ${ca.rem5h}%) - considerar rotar${RESET}`));
       }
     }
   }
@@ -1387,10 +1389,10 @@ function render() {
   }
   lines.push(drawBottom());
 
-  // Barra de atajos inferior dinámica
-  const hasCritical = accountsList.some((a) => a.isCritical || a.used5h >= 85);
+  // Barra de atajos inferior dinámica: solo sugerir 'x: migrar' si hay cuentas críticas que estén REALMENTE ACTIVAS
+  const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
-  const shortcutHint = hasCritical
+  const shortcutHint = hasActiveCritical
     ? `${TEXT_DIM} r: actualizar · d: deseleccionar · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
     : `${TEXT_DIM} r: actualizar · d: deseleccionar · q: salir · 2m · ${lastUpdatedTime || "en vivo"}${RESET}`;
   lines.push(shortcutHint);
