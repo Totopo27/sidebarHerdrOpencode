@@ -11,48 +11,48 @@ Sidebar Herdr OpenCode is an ambient terminal HUD engineered to run alongside Op
 
 ```text
                OPENCODE · GENTLE-AI
-╭─ Estado ─────────────────────────────────────────╮
-│ Proyecto                     ~/.../mi-proyecto   │
-│ Rama                                    main ±2  │
-│ Modelo             gemini-3.8-flash-high (high)  │
-│ mem: mi-proyecto · 4 MCPs · * acc-main ▸         │
-╰──────────────────────────────────────────────────╯
-╭─ Contexto ───────────────────────────────────────╮
-│ 125.0k / 1.0M tokens               Optimo 12.5%  │
+╭─ Estado ────────────────────────────────── [▼] ╮
+│ Proyecto                     ~/.../mi-proyecto │
+│ Rama                                  main ±2  │
+│ Modelo           gemini-3.8-flash-high (high)  │
+│ mem: mi-proyecto · 4 MCPs · * acc-main ▸       │
+╰────────────────────────────────────────────────╯
+╭─ Contexto ──────────────────────────────── [▼] ╮
+│ 125.0k / 1.0M tokens              Optimo 12.5% │
 │ ▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ │
-│ ^ 1.4M in · v 12.6k out             Costo $0.000 │
-╰──────────────────────────────────────────────────╯
-╭─ Engram: mi-proyecto ^ ──────────────────────────╮
-│ Local (7437)                 En línea · 80 obs   │
-│ Cloud: solo local             no configurado     │
-╰──────────────────────────────────────────────────╯
-╭─ Integraciones · 5 cuentas ──────────────────────╮
-│    ● acc-1  ▰▰▰▰▰▰▰▰▰▰ 100%          en 4h 59m   │
-│    ● acc-2  ▰▰▰▰▰▰▰▰▰▰ 100%          en 4h 59m   │
-│  ▸ ● acc-3  ▰▰▰▰▰▰▰▱▱▱  74%          en 2h 25m   │
-│    ● acc-4  ▰▰▰▰▰▰▰▰▰▰ 100%          en 4h 59m   │
-│    ● acc-5  ▰▰▰▰▰▰▰▰▰▰ 100%          en 4h 59m   │
-╰──────────────────────────────────────────────────╯
-╭─ antigravity · acc-3 (activa) ───────────────────╮
-│ ● Gemini Wk ▰▰▰▰▰▰▱▱  74%         ↑12% en 4d 4h │
-│ ● Gemini 5h ▰▰▱▱▱▱▱▱  24%          ~0% en 26m   │
-│ ● Claude Wk ▰▰▱▱▱▱▱▱  30%          ~0% en 2d 5h │
-│ ● Claude 5h ▰▰▰▰▰▰▰▰ 100%          ~0% en 4h 59m │
-╰──────────────────────────────────────────────────╯
-╭─ gráfico git ────────────────────────────────────╮
-│ main                                      limpio │
-│ * 858ee20 (HEAD -> main) feat: core hud          │
-│ 0 archivos · limpio              /gentle:changes │
-╰──────────────────────────────────────────────────╯
-╭─ herramientas · 70 llamadas ─────────────────────╮
-│ 23 lecturas   9 escrituras   >_ 21 bash  mem: 17 │
-╰──────────────────────────────────────────────────╯
-╭─ Servidores MCP · 3 activos ─────────────────────╮
-│ engram [local]                          en línea │
-│ context7 [remote]                       en línea │
-│ browser [local]                         en línea │
-╰──────────────────────────────────────────────────╯
- r: actualizar todo · x: migrar · q: salir · 2m
+│ ^ 1.4M in · v 12.6k out           Costo $0.000 │
+╰────────────────────────────────────────────────╯
+╭─ Engram: mi-proyecto ^ ─────────────────── [▼] ╮
+│ Local (7437)               En línea · 80 obs   │
+│ Cloud: solo local           no configurado     │
+╰────────────────────────────────────────────────╯
+╭─ Integraciones · 5 cuentas ─────────────── [▼] ╮
+│    ● acc-1  ▰▰▰▰▰▰▰▰▰▰ 100%         en 4h 59m │
+│    ● acc-2  ▰▰▰▰▰▰▰▰▰▰ 100%         en 4h 59m │
+│  ▸ ● acc-3  ▰▰▰▰▰▰▰▱▱▱  74%         en 2h 25m │
+│    ● acc-4  ▰▰▰▰▰▰▰▰▰▰ 100%         en 4h 59m │
+│    ● acc-5  ▰▰▰▰▰▰▰▰▰▰ 100%         en 4h 59m │
+╰────────────────────────────────────────────────╯
+╭─ Antigravity · acc-3 (activa) ──────────── [▼] ╮
+│ ● Gemini Wk ▰▰▰▰▰▰▱▱  74%        ↑12% en 4d 4h │
+│ ● Gemini 5h ▰▰▱▱▱▱▱▱  24%         ~0% en 26m   │
+│ ● Claude Wk ▰▰▱▱▱▱▱▱  30%         ~0% en 2d 5h │
+│ ● Claude 5h ▰▰▰▰▰▰▰▰ 100%         ~0% en 4h 59m│
+╰────────────────────────────────────────────────╯
+╭─ Git y Cambios ─────────────────────────── [▼] ╮
+│ main                                    limpio │
+│ * 858ee20 (HEAD -> main) feat: core hud        │
+│ 0 archivos · limpio            /gentle:changes │
+╰────────────────────────────────────────────────╯
+╭─ Herramientas · 70 llamadas ────────────── [▼] ╮
+│ 23 lecturas   9 escrituras  >_ 21 bash mem: 17 │
+╰────────────────────────────────────────────────╯
+╭─ Servidores MCP · 3 activos ────────────── [▼] ╮
+│ engram [local]                        en línea │
+│ context7 [remote]                     en línea │
+│ browser [local]                       en línea │
+╰────────────────────────────────────────────────╯
+ 1-8/clic: colapsar · c: todo · r: act · q: salir
 ```
 
 ---
@@ -149,6 +149,10 @@ When running multiple spaces or tabs in Herdr with shared API accounts, closing 
 
 | Command / Shortcut | Execution Context | Description |
 | :--- | :--- | :--- |
+| **Mouse Click** | Sidebar TUI | **Toggle Card:** Clic en cualquier encabezado de tarjeta para colapsar (`[▶]`) o expandir (`[▼]`). |
+| **Mouse Wheel** | Sidebar TUI | **Scroll Fluido:** Rueda arriba / abajo para desplazarse verticalmente. |
+| **`1` – `8`** | Sidebar TUI | **Atajos de Tarjetas:** Alterna colapso individual (1: Estado, 2: Contexto, 3: Engram, 4: Integraciones, 5: Antigravity, 6: Cambios, 7: Herramientas, 8: MCP). |
+| **`c`** | Sidebar TUI | **Colapso Global:** Alterna entre colapsar todas las tarjetas o expandir todas a la vez. |
 | **`r`** | Sidebar TUI | **Full Fleet Refresh:** Queries all configured accounts concurrently to update quotas on demand. |
 | **`x`** | Sidebar TUI | **Automated Critical Migration:** Migrates active sessions from critical accounts (>= 85% used) to the healthiest available account, logging a checkpoint in Engram. |
 | **`k` / `j`** or **Up / Down** | Sidebar TUI | **Viewport Scroll:** Navigates vertical content when terminal height is constrained. |

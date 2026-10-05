@@ -108,6 +108,19 @@ let flashNotice = null;
 let flashNoticeTimer = null;
 let pendingMigrationTarget = null; // Encolado para cuando el turno pase a idle
 
+// Estado de acordeón colapsable para cada tarjeta
+const collapsedCards = {
+  estado: false,
+  contexto: false,
+  engram: false,
+  integraciones: false,
+  pools: false,
+  git: false,
+  tools: false,
+  mcp: false,
+};
+let cardLineBounds = [];
+
 // ============================================================================
 // MOTOR DE MEDICION UNICODE A PRUEBA DE DESBORDES (ZERO-WRAPPING)
 // ============================================================================
@@ -1290,10 +1303,19 @@ function render() {
   const activePrefixes = opencode.allActivePrefixes;
 
   // Primitivas de dibujo indestructibles con parámetros tipados
-  const drawTop = (titleFormatted) => {
-    const tLen = stringWidth(titleFormatted);
-    const dashCount = Math.max(0, width - 5 - tLen);
-    return `${BORDER}╭─ ${titleFormatted} ${"─".repeat(dashCount)}╮${RESET}`;
+  cardLineBounds = [];
+
+  const drawTop = (titleFormatted, isCollapsed = false) => {
+    const icon = isCollapsed ? "▶" : "▼";
+    const iconBadge = `${TEXT_DIM}[${RESET}${TEXT_MUTED}${icon}${RESET}${TEXT_DIM}]${RESET}`;
+    const maxTitle = width - 12;
+    let cleanTitle = titleFormatted;
+    if (stringWidth(cleanTitle) > maxTitle) {
+      cleanTitle = truncateToWidth(cleanTitle, maxTitle);
+    }
+    const tLen = stringWidth(cleanTitle);
+    const dashCount = Math.max(0, width - 10 - tLen);
+    return `${BORDER}╭─ ${cleanTitle} ${"─".repeat(dashCount)} ${iconBadge} ${BORDER}╮${RESET}`;
   };
 
   const drawBottom = () => {
@@ -1362,74 +1384,87 @@ function render() {
   const petalIndicator = isWorking
     ? `${BOLD}${AMBER}◐ WORKING${RESET}`
     : `${TEXT_DIM}○ idle${RESET}`;
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET} ${TEXT_DIM}·${RESET} ${petalIndicator}`));
-  const shortProject = folder.length > 20 ? folder.slice(0, 18) + "…" : folder;
-  lines.push(drawRow(`${GOLD}Proyecto${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
-  const dirtyBadge = git.isClean ? `${MINT}limpio${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
-  lines.push(drawRow(`${GOLD}Rama${RESET}`, `${CYAN}ᛦ ${git.branch}${RESET} ${dirtyBadge}`));
-  const activeModelDisplay = `${ACCENT_PRIMARY}${opencode.modelShort}${RESET} ${GOLD}(high)${RESET}`;
-  lines.push(drawRow(`${GOLD}Modelo${RESET}`, activeModelDisplay));
-  
-  // Listado de perfiles activos en la línea sub-vitals
-  const mcpCountStr = mcpList.length > 0 ? `${mcpList.length} MCPs` : "0 MCPs";
-  const activeProfLabels = Array.from(activePrefixes).map((p) => `${ACCENT_PINK}*${RESET} ${MINT}${p}${RESET}`).join(" ") || `${TEXT_MUTED}default${RESET}`;
-  const subVitals = `${ACCENT_PRIMARY}mem:${RESET} ${TEXT_PRIMARY}${engram.project}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_MUTED}${mcpCountStr}${RESET} ${TEXT_DIM}·${RESET} ${activeProfLabels}`;
-  lines.push(drawRow(subVitals, `${ACCENT_PINK}▸${RESET}`));
+  const estadoTop = `${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET} ${TEXT_DIM}·${RESET} ${petalIndicator}`;
+  const estadoStart = lines.length;
+  lines.push(drawTop(estadoTop, collapsedCards.estado));
+  if (!collapsedCards.estado) {
+    const shortProject = folder.length > 20 ? folder.slice(0, 18) + "…" : folder;
+    lines.push(drawRow(`${GOLD}Proyecto${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
+    const dirtyBadge = git.isClean ? `${MINT}limpio${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
+    lines.push(drawRow(`${GOLD}Rama${RESET}`, `${CYAN}ᛦ ${git.branch}${RESET} ${dirtyBadge}`));
+    const activeModelDisplay = `${ACCENT_PRIMARY}${opencode.modelShort}${RESET} ${GOLD}(high)${RESET}`;
+    lines.push(drawRow(`${GOLD}Modelo${RESET}`, activeModelDisplay));
+    
+    // Listado de perfiles activos en la línea sub-vitals
+    const mcpCountStr = mcpList.length > 0 ? `${mcpList.length} MCPs` : "0 MCPs";
+    const activeProfLabels = Array.from(activePrefixes).map((p) => `${ACCENT_PINK}*${RESET} ${MINT}${p}${RESET}`).join(" ") || `${TEXT_MUTED}default${RESET}`;
+    const subVitals = `${ACCENT_PRIMARY}mem:${RESET} ${TEXT_PRIMARY}${engram.project}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_MUTED}${mcpCountStr}${RESET} ${TEXT_DIM}·${RESET} ${activeProfLabels}`;
+    lines.push(drawRow(subVitals, `${ACCENT_PINK}▸${RESET}`));
+  }
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "estado", startLine: estadoStart, endLine: lines.length - 1 });
 
   // 3. Contexto Card
-  lines.push(drawTop(`${BOLD}${GOLD}Contexto${RESET}`));
-  const contextLimit = resolveModelContextLimit(opencode.model, opencode.agent);
-  const currentTokens = opencode.activeTurnContextTokens > 0
-    ? opencode.activeTurnContextTokens
-    : 32_000;
+  const contextoStart = lines.length;
+  lines.push(drawTop(`${BOLD}${GOLD}Contexto${RESET}`, collapsedCards.contexto));
+  if (!collapsedCards.contexto) {
+    const contextLimit = resolveModelContextLimit(opencode.model, opencode.agent);
+    const currentTokens = opencode.activeTurnContextTokens > 0
+      ? opencode.activeTurnContextTokens
+      : 32_000;
 
-  const contextPercent = Math.max(0.1, ((currentTokens / contextLimit) * 100));
-  const isSaturated = currentTokens >= (contextLimit * 0.8);
-  const isMature = currentTokens >= (contextLimit * 0.5) && !isSaturated;
+    const contextPercent = Math.max(0.1, ((currentTokens / contextLimit) * 100));
+    const isSaturated = currentTokens >= (contextLimit * 0.8);
+    const isMature = currentTokens >= (contextLimit * 0.5) && !isSaturated;
 
-  let leftTokensStr;
-  let rightContextStatus;
-  let gaugeColor;
+    let leftTokensStr;
+    let rightContextStatus;
+    let gaugeColor;
 
-  if (isSaturated) {
-    gaugeColor = CORAL;
-    leftTokensStr = `${BOLD}${CORAL}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-    rightContextStatus = `${CORAL}● Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
-  } else if (isMature) {
-    gaugeColor = AMBER;
-    leftTokensStr = `${BOLD}${AMBER}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-    rightContextStatus = `${AMBER}● Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
-  } else {
-    const contextThreshold = getQuotaThreshold(100 - contextPercent);
-    gaugeColor = contextThreshold.color;
-    leftTokensStr = `${BOLD}${contextThreshold.color(formatTokenCount(currentTokens))}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-    rightContextStatus = `${contextThreshold.color("●")} ${BOLD}${contextThreshold.color(`Óptimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
-  }
+    if (isSaturated) {
+      gaugeColor = CORAL;
+      leftTokensStr = `${BOLD}${CORAL}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
+      rightContextStatus = `${CORAL}● Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+    } else if (isMature) {
+      gaugeColor = AMBER;
+      leftTokensStr = `${BOLD}${AMBER}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
+      rightContextStatus = `${AMBER}● Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+    } else {
+      const contextThreshold = getQuotaThreshold(100 - contextPercent);
+      gaugeColor = contextThreshold.color;
+      leftTokensStr = `${BOLD}${contextThreshold.color(formatTokenCount(currentTokens))}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
+      rightContextStatus = `${contextThreshold.color("●")} ${BOLD}${contextThreshold.color(`Óptimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
+    }
 
-  lines.push(drawRow(leftTokensStr, rightContextStatus));
-  lines.push(drawRow(renderGaugeInline(contextPercent, innerWidth, gaugeColor)));
-  const inTokens = opencode.tokensInput > 0 ? opencode.tokensInput : 1_400_000;
-  const outTokens = opencode.tokensOutput > 0 ? opencode.tokensOutput : 12_600;
-  const leftBreakdown = `${TEXT_DIM}▲${RESET} ${TEXT_PRIMARY}${formatTokenCount(inTokens)}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_DIM}▼${RESET} ${TEXT_PRIMARY}${formatTokenCount(outTokens)}${RESET}`;
-  const rightCost = `${GOLD}Costo${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
-  lines.push(drawRow(leftBreakdown, rightCost));
-  if (isMature || isSaturated) {
-    lines.push(drawRow(`${AMBER}[aviso] Sesion madura: usa /snew para handover limpio${RESET}`));
+    lines.push(drawRow(leftTokensStr, rightContextStatus));
+    lines.push(drawRow(renderGaugeInline(contextPercent, innerWidth, gaugeColor)));
+    const inTokens = opencode.tokensInput > 0 ? opencode.tokensInput : 1_400_000;
+    const outTokens = opencode.tokensOutput > 0 ? opencode.tokensOutput : 12_600;
+    const leftBreakdown = `${TEXT_DIM}▲${RESET} ${TEXT_PRIMARY}${formatTokenCount(inTokens)}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_DIM}▼${RESET} ${TEXT_PRIMARY}${formatTokenCount(outTokens)}${RESET}`;
+    const rightCost = `${GOLD}Costo${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
+    lines.push(drawRow(leftBreakdown, rightCost));
+    if (isMature || isSaturated) {
+      lines.push(drawRow(`${AMBER}[aviso] Sesion madura: usa /snew para handover limpio${RESET}`));
+    }
   }
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "contexto", startLine: contextoStart, endLine: lines.length - 1 });
 
   // 4. Engram Card
-  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`));
-  const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
-  lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
-  if (engram.cloudHost) {
-    const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
-    lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
-  } else {
-    lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+  const engramStart = lines.length;
+  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`, collapsedCards.engram));
+  if (!collapsedCards.engram) {
+    const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
+    lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
+    if (engram.cloudHost) {
+      const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
+    } else {
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+    }
   }
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "engram", startLine: engramStart, endLine: lines.length - 1 });
 
   // 5. ✿ Integraciones Card (TODAS LAS 5 CUENTAS + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
   const criticalAccounts = accountsList.filter((a) => a.isCritical);
@@ -1442,46 +1477,47 @@ function render() {
     intTitleRight = `${AMBER}! ${warningAccounts.length} en aviso (70%+)${RESET}`;
   }
   
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Integraciones${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`));
+  const integracionesStart = lines.length;
+  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Integraciones${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`, collapsedCards.integraciones));
 
-  const miniBarCells = Math.max(6, Math.min(10, innerWidth - 30));
+  if (!collapsedCards.integraciones) {
+    if (accountsList.length === 0) {
+      lines.push(drawRow(`${TEXT_DIM}Cargando cuentas de Antigravity…${RESET}`));
+    } else {
+      for (const acc of accountsList) {
+        // Detección multi-sesión: si la cuenta está activa en cualquier sesión abierta, se marca con ▸
+        const isActive = activePrefixes.has(acc.prefix.toLowerCase());
+        const marker = isActive ? `${ACCENT_PINK}▸${RESET}` : " ";
+        
+        let icon = `${MINT}●${RESET}`;
+        let pctColor = MINT;
+        let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
 
-  if (accountsList.length === 0) {
-    lines.push(drawRow(`${TEXT_DIM}Cargando cuentas de Antigravity…${RESET}`));
-  } else {
-    for (const acc of accountsList) {
-      // Detección multi-sesión: si la cuenta está activa en cualquier sesión abierta, se marca con ▸
-      const isActive = activePrefixes.has(acc.prefix.toLowerCase());
-      const marker = isActive ? `${ACCENT_PINK}▸${RESET}` : " ";
-      
-      let icon = `${MINT}●${RESET}`;
-      let pctColor = MINT;
-      let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
+        if (acc.hasError) {
+          icon = `${AMBER}?${RESET}`;
+          pctColor = AMBER;
+          statusNote = `${AMBER}[${acc.errorMsg}]${RESET}`;
+        } else if (acc.isCritical) {
+          icon = `${BOLD}${CORAL}!${RESET}`;
+          pctColor = CORAL;
+          statusNote = `${BOLD}${CORAL}[AGOTÁNDOSE]${RESET}`;
+        } else if (acc.isWarning) {
+          icon = `${BOLD}${AMBER}!${RESET}`;
+          pctColor = AMBER;
+          statusNote = `${AMBER}[AVISO 70%]${RESET}`;
+        }
 
-      if (acc.hasError) {
-        icon = `${AMBER}?${RESET}`;
-        pctColor = AMBER;
-        statusNote = `${AMBER}[${acc.errorMsg}]${RESET}`;
-      } else if (acc.isCritical) {
-        icon = `${BOLD}${CORAL}!${RESET}`;
-        pctColor = CORAL;
-        statusNote = `${BOLD}${CORAL}[AGOTÁNDOSE]${RESET}`;
-      } else if (acc.isWarning) {
-        icon = `${BOLD}${AMBER}!${RESET}`;
-        pctColor = AMBER;
-        statusNote = `${AMBER}[AVISO 70%]${RESET}`;
+        const pfxDisplay = isActive
+          ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(5)}${RESET}`
+          : `${TEXT_MUTED}${acc.prefix.padEnd(5)}${RESET}`;
+
+        const pctDisplay = `${BOLD}${pctColor}${String(acc.rem5h).padStart(3)}%${RESET}`;
+        const bar = renderGaugeInline(acc.rem5h, 10, pctColor);
+        const leftCol = `${marker} ${icon} ${pfxDisplay} ${bar} ${pctDisplay}`;
+        const rightCol = statusNote;
+
+        lines.push(drawRow(leftCol, rightCol));
       }
-
-      const pfxDisplay = isActive
-        ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(5)}${RESET}`
-        : `${TEXT_MUTED}${acc.prefix.padEnd(5)}${RESET}`;
-
-      const pctDisplay = `${BOLD}${pctColor}${String(acc.rem5h).padStart(3)}%${RESET}`;
-      const bar = renderGaugeInline(acc.rem5h, 10, pctColor);
-      const leftCol = `${marker} ${icon} ${pfxDisplay} ${bar} ${pctDisplay}`;
-      const rightCol = statusNote;
-
-      lines.push(drawRow(leftCol, rightCol));
     }
   }
 
@@ -1509,6 +1545,7 @@ function render() {
   }
 
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "integraciones", startLine: integracionesStart, endLine: lines.length - 1 });
 
   // 5B. ✿ Active Account Pools Breakdown Card (Gemini Wk/5h + Claude Wk/5h)
   const targetActiveAccounts = accountsList.filter((a) => activePrefixes.has(a.prefix.toLowerCase()));
@@ -1517,95 +1554,115 @@ function render() {
   for (const acc of poolCardsToShow) {
     if (acc.pools && acc.pools.length > 0) {
       const activeTag = activePrefixes.has(acc.prefix.toLowerCase()) ? " (activa)" : "";
-      lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`));
+      const poolsStart = lines.length;
+      lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`, collapsedCards.pools));
 
-      if (acc.hasError) {
-        lines.push(drawRow(`${AMBER}! ${acc.errorMsg}${RESET}`));
-      }
+      if (!collapsedCards.pools) {
+        if (acc.hasError) {
+          lines.push(drawRow(`${AMBER}! ${acc.errorMsg}${RESET}`));
+        }
 
-      const poolGaugeCells = 8;
-      for (const p of acc.pools) {
-        const threshold = getQuotaThreshold(p.percent);
-        const pctFmt = `${BOLD}${threshold.color(String(p.percent).padStart(3) + "%")}${RESET}`;
-        const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
-        const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
-        const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-        const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
-        const rightCol = `${paceStr}${resetStr}`.trim();
-        lines.push(drawRow(leftCol, rightCol));
+        const poolGaugeCells = 8;
+        for (const p of acc.pools) {
+          const threshold = getQuotaThreshold(p.percent);
+          const pctFmt = `${BOLD}${threshold.color(String(p.percent).padStart(3) + "%")}${RESET}`;
+          const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
+          const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
+          const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
+          const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
+          const rightCol = `${paceStr}${resetStr}`.trim();
+          lines.push(drawRow(leftCol, rightCol));
+        }
       }
 
       lines.push(drawBottom());
+      cardLineBounds.push({ id: "pools", startLine: poolsStart, endLine: lines.length - 1 });
     }
   }
 
   // 6. ᛦ Gráfico Git & Gentle Attributed Changes Card
   const agentFilesCount = opencode.attributedChanges.files.size;
   const agentChangesTitle = agentFilesCount > 0
-    ? `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}cambios${RESET} ${TEXT_DIM}· ${agentFilesCount} por agente${RESET}`
-    : `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}git y cambios${RESET}`;
-  lines.push(drawTop(agentChangesTitle));
+    ? `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}Cambios${RESET} ${TEXT_DIM}· ${agentFilesCount} por agente${RESET}`
+    : `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}Git y Cambios${RESET}`;
+  const gitStart = lines.length;
+  lines.push(drawTop(agentChangesTitle, collapsedCards.git));
 
-  const gitBadges = git.isClean
-    ? `${MINT}✔ limpio${RESET}`
-    : `${AMBER}● ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
-  lines.push(drawRow(`${CYAN}${git.branch}${RESET}`, gitBadges));
+  if (!collapsedCards.git) {
+    const gitBadges = git.isClean
+      ? `${MINT}✔ limpio${RESET}`
+      : `${AMBER}● ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
+    lines.push(drawRow(`${CYAN}${git.branch}${RESET}`, gitBadges));
 
-  if (git.graphLines.length > 0) {
-    for (const gLine of git.graphLines.slice(0, 2)) {
-      lines.push(drawRow(colorizeGitGraphLine(gLine)));
+    if (git.graphLines.length > 0) {
+      for (const gLine of git.graphLines.slice(0, 2)) {
+        lines.push(drawRow(colorizeGitGraphLine(gLine)));
+      }
+    } else {
+      lines.push(drawRow(`${TEXT_DIM}* (sin commits recientes)${RESET}`));
     }
-  } else {
-    lines.push(drawRow(`${TEXT_DIM}* (sin commits recientes)${RESET}`));
+
+    // Desglose dual: Git Working Tree vs Attributed Changes de Gentle-Shell
+    const totalDiffFiles = git.modified + git.staged;
+    const changesSummary = totalDiffFiles > 0
+      ? `${TEXT_DIM}git:${RESET} ${TEXT_PRIMARY}${totalDiffFiles} archivos${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
+      : `${TEXT_DIM}git:${RESET} ${MINT}limpio${RESET}`;
+
+    const agentSummary = agentFilesCount > 0
+      ? `${ACCENT_PRIMARY}✎ agente:${RESET} ${MINT}${agentFilesCount} archivos${RESET} ${TEXT_DIM}(+${opencode.attributedChanges.additions} -${opencode.attributedChanges.deletions})${RESET}`
+      : `${ACCENT_PRIMARY}✎ agente:${RESET} ${TEXT_DIM}0 archivos${RESET}`;
+
+    lines.push(drawRow(changesSummary, agentSummary));
   }
 
-  // Desglose dual: Git Working Tree vs Attributed Changes de Gentle-Shell
-  const totalDiffFiles = git.modified + git.staged;
-  const changesSummary = totalDiffFiles > 0
-    ? `${TEXT_DIM}git:${RESET} ${TEXT_PRIMARY}${totalDiffFiles} archivos${RESET} ${TEXT_DIM}·${RESET} ${MINT}+${git.linesAdded}${RESET} ${CORAL}-${git.linesDeleted}${RESET}`
-    : `${TEXT_DIM}git:${RESET} ${MINT}limpio${RESET}`;
-
-  const agentSummary = agentFilesCount > 0
-    ? `${ACCENT_PRIMARY}✎ agente:${RESET} ${MINT}${agentFilesCount} archivos${RESET} ${TEXT_DIM}(+${opencode.attributedChanges.additions} -${opencode.attributedChanges.deletions})${RESET}`
-    : `${ACCENT_PRIMARY}✎ agente:${RESET} ${TEXT_DIM}0 archivos${RESET}`;
-
-  lines.push(drawRow(changesSummary, agentSummary));
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "git", startLine: gitStart, endLine: lines.length - 1 });
 
   // 7. Herramientas Telemetry Card
   const toolsCount = opencode.tools.total > 0 ? opencode.tools : { read: 6, write: 7, bash: 16, engram: 1, other: 1, total: 31 };
-  const toolsTitleFmt = `${BOLD}${GOLD}herramientas${RESET} ${TEXT_DIM}· ${toolsCount.total} llamadas${RESET}`;
-  lines.push(drawTop(toolsTitleFmt));
+  const toolsTitleFmt = `${BOLD}${GOLD}Herramientas${RESET} ${TEXT_DIM}· ${toolsCount.total} llamadas${RESET}`;
+  const toolsStart = lines.length;
+  lines.push(drawTop(toolsTitleFmt, collapsedCards.tools));
 
-  const pRead = `${MAGENTA}✎ ${toolsCount.read} lecturas${RESET}`;
-  const pWrite = `${CYAN}✎ ${toolsCount.write} escrituras${RESET}`;
-  const pBash = `${MINT}>_ ${toolsCount.bash} bash${RESET}`;
-  const pEngram = `${CORAL}mem: ${toolsCount.engram}${RESET}`;
-  lines.push(drawRow(`${pRead}  ${pWrite}  ${pBash}`, pEngram));
+  if (!collapsedCards.tools) {
+    const pRead = `${MAGENTA}✎ ${toolsCount.read} lecturas${RESET}`;
+    const pWrite = `${CYAN}✎ ${toolsCount.write} escrituras${RESET}`;
+    const pBash = `${MINT}>_ ${toolsCount.bash} bash${RESET}`;
+    const pEngram = `${CORAL}mem: ${toolsCount.engram}${RESET}`;
+    lines.push(drawRow(`${pRead}  ${pWrite}  ${pBash}`, pEngram));
+  }
+
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "tools", startLine: toolsStart, endLine: lines.length - 1 });
 
   // 8. Servidores MCP Card
   const mcpTitle = `${BOLD}${GOLD}Servidores MCP${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
-  lines.push(drawTop(mcpTitle));
-  if (mcpList.length === 0) {
-    lines.push(drawRow(`${TEXT_DIM}Sin servidores MCP configurados${RESET}`));
-  } else {
-    for (const mcp of mcpList) {
-      const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
-      const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
-      const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
-      const statusText = mcp.enabled ? `${MINT}en línea${RESET}` : `${TEXT_MUTED}desactivado${RESET}`;
-      lines.push(drawRow(`${statusDot} ${nameFmt} ${typeBadge}`, statusText));
+  const mcpStart = lines.length;
+  lines.push(drawTop(mcpTitle, collapsedCards.mcp));
+
+  if (!collapsedCards.mcp) {
+    if (mcpList.length === 0) {
+      lines.push(drawRow(`${TEXT_DIM}Sin servidores MCP configurados${RESET}`));
+    } else {
+      for (const mcp of mcpList) {
+        const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
+        const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
+        const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
+        const statusText = mcp.enabled ? `${MINT}en línea${RESET}` : `${TEXT_MUTED}desactivado${RESET}`;
+        lines.push(drawRow(`${statusDot} ${nameFmt} ${typeBadge}`, statusText));
+      }
     }
   }
+
   lines.push(drawBottom());
+  cardLineBounds.push({ id: "mcp", startLine: mcpStart, endLine: lines.length - 1 });
 
   // Barra de atajos inferior dinámica: solo sugerir 'x: migrar' si hay cuentas críticas que estén REALMENTE ACTIVAS
   const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
   const shortcutHint = hasActiveCritical
-    ? `${TEXT_DIM} r: actualizar · d: deseleccionar · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
-    : `${TEXT_DIM} r: actualizar · d: deseleccionar · q: salir · 2m · ${lastUpdatedTime || "en vivo"}${RESET}`;
+    ? `${TEXT_DIM} 1-8/clic: colapsar · r: act · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
+    : `${TEXT_DIM} 1-8/clic: colapsar · c: todo · r: act · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`;
   lines.push(shortcutHint);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
@@ -1620,13 +1677,52 @@ function render() {
 }
 
 // ============================================================================
-// ATAJOS DE TECLADO Y CICLO DE VIDA
+// ATAJOS DE TECLADO, RATON Y CICLO DE VIDA
 // ============================================================================
 if (process.stdin.isTTY) {
   process.stdin.setRawMode(true);
   process.stdin.resume();
   process.stdin.on("data", (data) => {
-    const key = data.toString();
+    const raw = data.toString();
+
+    // 1. Manejo de Mouse (SGR Extended Mode: \x1b[<button;x;yM / m)
+    const mouseMatch = raw.match(/\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
+    if (mouseMatch) {
+      const btn = parseInt(mouseMatch[1], 10);
+      const y = parseInt(mouseMatch[3], 10);
+      const isPress = mouseMatch[4] === "M";
+
+      if (isPress) {
+        if (btn === 0) { // Clic izquierdo
+          const clickedLine = (y - 1) + scrollOffset;
+          const hitCard = cardLineBounds.find((c) => {
+            if (collapsedCards[c.id]) {
+              return clickedLine >= c.startLine && clickedLine <= c.endLine;
+            }
+            return clickedLine === c.startLine || clickedLine === c.endLine;
+          });
+          if (hitCard) {
+            collapsedCards[hitCard.id] = !collapsedCards[hitCard.id];
+            scheduleRender();
+            return;
+          }
+        } else if (btn === 64) { // Rueda arriba (Scroll UP)
+          if (scrollOffset > 0) {
+            scrollOffset = Math.max(0, scrollOffset - 2);
+            scheduleRender();
+          }
+          return;
+        } else if (btn === 65) { // Rueda abajo (Scroll DOWN)
+          scrollOffset += 2;
+          scheduleRender();
+          return;
+        }
+      }
+      return;
+    }
+
+    // 2. Manejo de Teclado
+    const key = raw;
     if (key === "q" || key === "\u0003") {
       cleanupAndExit();
     } else if (key === "r" || key === "R") {
@@ -1635,6 +1731,20 @@ if (process.stdin.isTTY) {
       releaseInactiveSessions(); // Deseleccionar/archivar sesiones huérfanas en desuso
     } else if (key === "x" || key === "X") {
       migrateCriticalSessions(); // Migrar automáticamente sesiones con cuenta crítica
+    } else if (key === "c" || key === "C") {
+      // Alternar todas las tarjetas (colapsar todo / expandir todo)
+      const anyOpen = Object.values(collapsedCards).some((v) => !v);
+      for (const k of Object.keys(collapsedCards)) {
+        collapsedCards[k] = anyOpen;
+      }
+      scheduleRender();
+    } else if (key >= "1" && key <= "8") {
+      const cardKeys = ["estado", "contexto", "engram", "integraciones", "pools", "git", "tools", "mcp"];
+      const target = cardKeys[parseInt(key, 10) - 1];
+      if (target) {
+        collapsedCards[target] = !collapsedCards[target];
+        scheduleRender();
+      }
     } else if (key === "\u001b[A" || key === "k") {
       if (scrollOffset > 0) {
         scrollOffset--;
@@ -1648,14 +1758,15 @@ if (process.stdin.isTTY) {
 }
 
 function cleanupAndExit() {
-  process.stdout.write("\x1b[?1049l\x1b[?25h\n");
+  process.stdout.write("\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l\x1b[?25h\n");
   process.exit(0);
 }
 
-process.stdout.write("\x1b[?1049h\x1b[?25l");
+// Activar pantalla alterna, ocultar cursor y habilitar mouse tracking SGR
+process.stdout.write("\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1002h\x1b[?1006h");
 
 process.on("exit", () => {
-  process.stdout.write("\x1b[?1049l\x1b[?25h");
+  process.stdout.write("\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l\x1b[?25h");
 });
 
 process.on("SIGINT", cleanupAndExit);
