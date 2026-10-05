@@ -112,10 +112,11 @@ let pendingMigrationTarget = null; // Encolado para cuando el turno pase a idle
 const collapsedCards = {
   estado: false,
   contexto: false,
-  engram: false,
+  proyecto: true,
   integraciones: false,
   pools: false,
   git: false,
+  engram: false,
   tools: false,
   mcp: false,
 };
@@ -431,6 +432,108 @@ function colorizeGitGraphLine(line) {
   }
   const subject = m[4] ? ` ${TEXT_PRIMARY}${m[4]}${RESET}` : "";
   return `${graphPart} ${hash}${refs}${subject}`;
+}
+
+// ============================================================================
+// EXPLORADOR DE PROYECTO / ARBOL DE DIRECTORIOS (2 NIVELES)
+// ============================================================================
+const PROJECT_TREE_IGNORED = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  ".cache",
+  "build",
+  ".next",
+  ".turbo",
+  ".idea",
+  ".vscode",
+  ".venv",
+  "__pycache__",
+  "coverage",
+]);
+
+function getProjectTreeData(targetDir) {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(targetDir, { withFileTypes: true });
+  } catch {
+    return { rootPath: targetDir, totalDirs: 0, totalFiles: 0, tree: [] };
+  }
+
+  // Filtrar archivos ocultos (.*) y directorios pesados/ignorados
+  const filtered = entries.filter((e) => !e.name.startsWith(".") && !PROJECT_TREE_IGNORED.has(e.name));
+
+  filtered.sort((a, b) => {
+    if (a.isDirectory() && !b.isDirectory()) return -1;
+    if (!a.isDirectory() && b.isDirectory()) return 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+
+  let totalDirs = 0;
+  let totalFiles = 0;
+
+  const tree = [];
+  for (const item of filtered) {
+    if (item.isDirectory()) {
+      totalDirs++;
+      const subDirPath = path.join(targetDir, item.name);
+      let subChildren = [];
+      try {
+        const subEntries = fs.readdirSync(subDirPath, { withFileTypes: true });
+        const subFiltered = subEntries.filter((s) => !s.name.startsWith(".") && !PROJECT_TREE_IGNORED.has(s.name));
+        subFiltered.sort((a, b) => {
+          if (a.isDirectory() && !b.isDirectory()) return -1;
+          if (!a.isDirectory() && b.isDirectory()) return 1;
+          return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+        });
+        for (const s of subFiltered) {
+          if (s.isDirectory()) totalDirs++;
+          else totalFiles++;
+          subChildren.push({
+            name: s.name,
+            isDir: s.isDirectory(),
+          });
+        }
+      } catch {}
+
+      tree.push({
+        name: item.name,
+        isDir: true,
+        children: subChildren,
+      });
+    } else {
+      totalFiles++;
+      tree.push({
+        name: item.name,
+        isDir: false,
+        children: [],
+      });
+    }
+  }
+
+  return {
+    rootPath: targetDir,
+    totalDirs,
+    totalFiles,
+    tree,
+  };
+}
+
+function openInFileExplorer(targetPath) {
+  try {
+    const absPath = path.resolve(targetPath);
+    if (process.platform === "win32") {
+      const winPath = absPath.replace(/\//g, "\\");
+      execFileSync("explorer.exe", [winPath], { stdio: "ignore" });
+    } else if (process.platform === "darwin") {
+      execFileSync("open", [absPath], { stdio: "ignore" });
+    } else {
+      execFileSync("xdg-open", [absPath], { stdio: "ignore" });
+    }
+    setFlashNotice(`✔ Abierto en explorador: ${path.basename(absPath)}`);
+  } catch (err) {
+    setFlashNotice(`! Error abriendo carpeta: ${err.message}`);
+  }
 }
 
 // ============================================================================
@@ -1300,13 +1403,14 @@ function render() {
 
   const engram = getEngramData(folder.toLowerCase(), targetDir);
   const mcpList = getMcpData(targetDir);
+  const projectTreeData = getProjectTreeData(targetDir);
   const activePrefixes = opencode.allActivePrefixes;
 
   // Primitivas de dibujo indestructibles con parámetros tipados
   cardLineBounds = [];
 
   const drawTop = (titleFormatted, isCollapsed = false) => {
-    const icon = isCollapsed ? "▶" : "▼";
+    const icon = isCollapsed ? "▲" : "▼";
     const iconBadge = `${TEXT_DIM}[${RESET}${TEXT_MUTED}${icon}${RESET}${TEXT_DIM}]${RESET}`;
     const maxTitle = width - 12;
     let cleanTitle = titleFormatted;
@@ -1367,7 +1471,7 @@ function render() {
     }
     const emptyCount = Math.max(0, availableCells - filledCount);
     const colFn = typeof thresholdColor === "function" ? thresholdColor : (s) => `${thresholdColor}${s}${RESET}`;
-    return `${colFn("▰".repeat(filledCount))}${TEXT_DIM}${"▱".repeat(emptyCount)}${RESET}`;
+    return `${colFn("━".repeat(filledCount))}${TEXT_DIM}${"─".repeat(emptyCount)}${RESET}`;
   };
 
   const lines = [];
@@ -1450,21 +1554,47 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "contexto", startLine: contextoStart, endLine: lines.length - 1 });
 
-  // 4. Engram Card
-  const engramStart = lines.length;
-  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`, collapsedCards.engram));
-  if (!collapsedCards.engram) {
-    const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
-    lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
-    if (engram.cloudHost) {
-      const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
-      lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
+  // 3B. Proyecto / Archivos Card (2 Niveles, colapsada por defecto)
+  const proyectoStart = lines.length;
+  const projectStatsBadge = `${TEXT_DIM}${projectTreeData.totalDirs}d · ${projectTreeData.totalFiles}f${RESET}`;
+  const projectCardTitle = `${ACCENT_PRIMARY}⌂${RESET} ${BOLD}${GOLD}Proyecto${RESET} ${TEXT_DIM}·${RESET} ${CYAN}${folder}${RESET} ${projectStatsBadge}`;
+  lines.push(drawTop(projectCardTitle, collapsedCards.proyecto));
+
+  if (!collapsedCards.proyecto) {
+    // Fila 1: Botón interactivo de abrir en explorador
+    const normalizedRoot = projectTreeData.rootPath.replace(/\\/g, "/");
+    lines.push(drawRow(`${GOLD}Ruta${RESET} ${MINT}[abrir en PC ↗]${RESET}`, `${TEXT_PRIMARY}${normalizedRoot}${RESET}`));
+
+    if (projectTreeData.tree.length === 0) {
+      lines.push(drawRow(`${TEXT_DIM}(carpeta vacía o sin archivos visibles)${RESET}`));
     } else {
-      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+      for (const item of projectTreeData.tree) {
+        if (item.isDir) {
+          const dirIcon = `${CYAN}▸ /${RESET}`;
+          const dirCountBadge = `${TEXT_DIM}(${item.children.length})${RESET}`;
+          lines.push(drawRow(`${dirIcon} ${TEXT_PRIMARY}${item.name}/${RESET} ${dirCountBadge}`));
+
+          // Nivel 2: subelementos
+          for (const sub of item.children) {
+            const subIcon = sub.isDir ? `${CYAN}└ /${RESET}` : `${TEXT_DIM}└ ${RESET}`;
+            const subName = sub.isDir ? `${TEXT_PRIMARY}${sub.name}/${RESET}` : `${TEXT_MUTED}${sub.name}${RESET}`;
+            lines.push(drawRow(`   ${subIcon} ${subName}`));
+          }
+        } else {
+          const fileIcon = `${TEXT_DIM}• ${RESET}`;
+          lines.push(drawRow(`${fileIcon} ${TEXT_MUTED}${item.name}${RESET}`));
+        }
+      }
     }
   }
   lines.push(drawBottom());
-  cardLineBounds.push({ id: "engram", startLine: engramStart, endLine: lines.length - 1 });
+  cardLineBounds.push({
+    id: "proyecto",
+    startLine: proyectoStart,
+    endLine: lines.length - 1,
+    actionLine: !collapsedCards.proyecto ? proyectoStart + 1 : null,
+    actionPath: projectTreeData.rootPath,
+  });
 
   // 5. ✿ Integraciones Card (TODAS LAS 5 CUENTAS + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
   const criticalAccounts = accountsList.filter((a) => a.isCritical);
@@ -1508,11 +1638,11 @@ function render() {
         }
 
         const pfxDisplay = isActive
-          ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(5)}${RESET}`
-          : `${TEXT_MUTED}${acc.prefix.padEnd(5)}${RESET}`;
+          ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(7)}${RESET}`
+          : `${TEXT_MUTED}${acc.prefix.padEnd(7)}${RESET}`;
 
         const pctDisplay = `${BOLD}${pctColor}${String(acc.rem5h).padStart(3)}%${RESET}`;
-        const bar = renderGaugeInline(acc.rem5h, 10, pctColor);
+        const bar = renderGaugeInline(acc.rem5h, 8, pctColor);
         const leftCol = `${marker} ${icon} ${pfxDisplay} ${bar} ${pctDisplay}`;
         const rightCol = statusNote;
 
@@ -1569,7 +1699,7 @@ function render() {
           const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
           const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
           const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-          const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
+          const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
           const rightCol = `${paceStr}${resetStr}`.trim();
           lines.push(drawRow(leftCol, rightCol));
         }
@@ -1618,7 +1748,23 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "git", startLine: gitStart, endLine: lines.length - 1 });
 
-  // 7. Herramientas Telemetry Card
+  // 7. Engram Card
+  const engramStart = lines.length;
+  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`, collapsedCards.engram));
+  if (!collapsedCards.engram) {
+    const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
+    lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
+    if (engram.cloudHost) {
+      const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
+    } else {
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+    }
+  }
+  lines.push(drawBottom());
+  cardLineBounds.push({ id: "engram", startLine: engramStart, endLine: lines.length - 1 });
+
+  // 8. Herramientas Telemetry Card
   const toolsCount = opencode.tools.total > 0 ? opencode.tools : { read: 6, write: 7, bash: 16, engram: 1, other: 1, total: 31 };
   const toolsTitleFmt = `${BOLD}${GOLD}Herramientas${RESET} ${TEXT_DIM}· ${toolsCount.total} llamadas${RESET}`;
   const toolsStart = lines.length;
@@ -1635,8 +1781,8 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "tools", startLine: toolsStart, endLine: lines.length - 1 });
 
-  // 8. Servidores MCP Card
-  const mcpTitle = `${BOLD}${GOLD}Servidores MCP${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
+  // 9. MCP Card (abajo del todo)
+  const mcpTitle = `${BOLD}${GOLD}MCP${RESET} ${TEXT_DIM}· ${mcpList.length} activos${RESET}`;
   const mcpStart = lines.length;
   lines.push(drawTop(mcpTitle, collapsedCards.mcp));
 
@@ -1661,8 +1807,8 @@ function render() {
   const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
   const shortcutHint = hasActiveCritical
-    ? `${TEXT_DIM} 1-8/clic: colapsar · r: act · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`
-    : `${TEXT_DIM} 1-8/clic: colapsar · c: todo · r: act · q: salir · ${lastUpdatedTime || "en vivo"}${RESET}`;
+    ? `${TEXT_DIM} 1-9/clic: colapsar · o: abrir carpeta · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir${RESET}`
+    : `${TEXT_DIM} 1-9/clic: colapsar · o: abrir carpeta · c: todo · r: act · q: salir${RESET}`;
   lines.push(shortcutHint);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
@@ -1695,6 +1841,14 @@ if (process.stdin.isTTY) {
       if (isPress) {
         if (btn === 0) { // Clic izquierdo
           const clickedLine = (y - 1) + scrollOffset;
+
+          // Verificar si el clic fue en la acción especial de abrir carpeta
+          const actionHit = cardLineBounds.find((c) => c.actionLine === clickedLine && c.actionPath);
+          if (actionHit) {
+            openInFileExplorer(actionHit.actionPath);
+            return;
+          }
+
           const hitCard = cardLineBounds.find((c) => {
             if (collapsedCards[c.id]) {
               return clickedLine >= c.startLine && clickedLine <= c.endLine;
@@ -1731,6 +1885,9 @@ if (process.stdin.isTTY) {
       releaseInactiveSessions(); // Deseleccionar/archivar sesiones huérfanas en desuso
     } else if (key === "x" || key === "X") {
       migrateCriticalSessions(); // Migrar automáticamente sesiones con cuenta crítica
+    } else if (key === "o" || key === "O") {
+      const activeProjPath = projectTreeData ? projectTreeData.rootPath : targetDir;
+      openInFileExplorer(activeProjPath);
     } else if (key === "c" || key === "C") {
       // Alternar todas las tarjetas (colapsar todo / expandir todo)
       const anyOpen = Object.values(collapsedCards).some((v) => !v);
@@ -1738,8 +1895,8 @@ if (process.stdin.isTTY) {
         collapsedCards[k] = anyOpen;
       }
       scheduleRender();
-    } else if (key >= "1" && key <= "8") {
-      const cardKeys = ["estado", "contexto", "engram", "integraciones", "pools", "git", "tools", "mcp"];
+    } else if (key >= "1" && key <= "9") {
+      const cardKeys = ["estado", "contexto", "proyecto", "integraciones", "pools", "git", "engram", "tools", "mcp"];
       const target = cardKeys[parseInt(key, 10) - 1];
       if (target) {
         collapsedCards[target] = !collapsedCards[target];
