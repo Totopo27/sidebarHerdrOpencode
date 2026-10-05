@@ -39,7 +39,7 @@ try {
     const newPaneId = splitData.result?.pane?.pane_id || splitData.result?.new_pane_id;
 
     if (newPaneId) {
-      execSync(`herdr pane run ${newPaneId} "${STATUS_SIDEBAR_CMD}"`, {
+      execSync(`herdr pane run ${newPaneId} ${JSON.stringify(STATUS_SIDEBAR_CMD)}`, {
         stdio: ["ignore", "pipe", "ignore"],
       });
       process.exit(0);
@@ -56,7 +56,7 @@ try {
   // Si el usuario está en el pane principal de OpenCode y el otro pane existe:
   const otherPane = panesInTab.find((p) => p.pane_id !== currentPaneId);
   if (otherPane) {
-    execSync(`herdr pane run ${otherPane.pane_id} "${STATUS_SIDEBAR_CMD}"`, {
+    execSync(`herdr pane run ${otherPane.pane_id} ${JSON.stringify(STATUS_SIDEBAR_CMD)}`, {
       stdio: ["ignore", "pipe", "ignore"],
     });
     process.exit(0);

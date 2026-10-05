@@ -84,11 +84,12 @@ Este proyecto nació porque ninguna de esas dos opciones sirve cuando trabajás 
 - Shows active sub-vitals line: resolved Engram memory namespace, active MCP server tally, and configured account profile indicator.
 
 ### 2. Contexto Gauge Card
-- Real-time token consumption tracking over the 1,000,000 token window.
+- Real-time token consumption tracking scaled dynamically to the active LLM context window (via `models.json` discovery).
 - Three-stage context lifecycle thresholds:
-  - **Optimal (< 500k tokens):** Mint indicator with proportional fill gauge.
-  - **Mature (500k – 799k tokens):** Amber warning indicator suggesting a clean handover via `/snew`.
-  - **Saturated (>= 800k tokens):** Coral alert indicator warning against context degradation.
+  - **Optimal (< 50% capacity):** Mint indicator with proportional fill gauge.
+  - **Mature (50% – 79% capacity):** Amber warning indicator suggesting a clean handover via `/snew`.
+  - **Saturated (>= 80% capacity):** Coral alert indicator warning against context degradation.
+- Complete OpenCode 2 token measurement formula: `input + output + reasoning + cache.read + cache.write`.
 - Cumulative input/output token counters and estimated USD session cost.
 
 ### 3. Engram Persistent Memory Card
@@ -104,10 +105,16 @@ Este proyecto nació porque ninguna de esas dos opciones sirve cuando trabajás 
 
 ### 5. Active Account Pools Breakdown Card
 - Deep breakdown of the 4 quota pools for the account actively driving the current session:
-  - Gemini Weekly pool + relative reset countdown.
-  - Gemini 5-hour rolling window + reset countdown.
-  - Claude / Secondary model weekly pool.
-  - Claude / Secondary model 5-hour window.
+  - Gemini Weekly pool + relative reset countdown + predictive Pacing indicator (`↑N%` headroom / `↓N%` overburn).
+  - Gemini 5-hour rolling window + reset countdown + 5h Pacing indicator.
+  - Claude / Secondary model weekly pool + Pacing indicator.
+  - Claude / Secondary model 5-hour window + Pacing indicator.
+- **Predictive Quota Pacing Engine:**
+  - Evaluates consumption speed against the remaining cycle clock instead of relying on misleading static percentages:
+    $$\text{Pacing} = (\% \text{ cuota consumida}) - (\% \text{ tiempo transcurrido del ciclo})$$
+  - **`↑N%` (Mint / Verde):** Headroom a favor. Consumo holgado y sostenible respecto al tiempo restante de la ventana.
+  - **`~0%` (Dorado):** Ritmo balanceado a la par del reloj.
+  - **`↓N%` (Coral / Rojo):** Sobregiro de ritmo (Burn rate excesivo). Alerta temprana de agotamiento prematuro antes del reset.
 
 ### 6. Gráfico Git Card
 - Commit tree preview rendered with branch indicators, porcelain status checks, modified/staged file counts, and net diff line totals (`+X -Y`).

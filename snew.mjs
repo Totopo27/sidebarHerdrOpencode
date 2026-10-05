@@ -256,7 +256,7 @@ const designatedAgent = `sdd-orchestrator-${targetPrefix}`;
 
 if (inHerdr) {
   try {
-    const tabRaw = execSync(`herdr tab create --cwd "${cwd}" --label "${folder}" --focus`, {
+    const tabRaw = execFileSync("herdr", ["tab", "create", "--cwd", cwd, "--label", folder, "--focus"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
@@ -273,10 +273,10 @@ if (inHerdr) {
       if (tabPanes.length > 0) {
         const mainPaneId = tabPanes[0].pane_id;
         // Iniciar OpenCode en el pane izquierdo con el agente asignado a la cuenta óptima
-        execSync(`herdr pane run ${mainPaneId} "opencode --agent ${designatedAgent}"`, { stdio: ["ignore", "pipe", "ignore"] });
+        execFileSync("herdr", ["pane", "run", mainPaneId, `opencode --agent ${designatedAgent}`], { stdio: ["ignore", "pipe", "ignore"] });
 
         // Crear split a la derecha para el sidebar (ratio 0.74 = 26% sidebar)
-        const splitRaw = execSync(`herdr pane split --pane ${mainPaneId} --direction right --ratio 0.74 --no-focus`, {
+        const splitRaw = execFileSync("herdr", ["pane", "split", "--pane", mainPaneId, "--direction", "right", "--ratio", "0.74", "--no-focus"], {
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
         });
@@ -284,7 +284,7 @@ if (inHerdr) {
         const sidePaneId = splitData.result?.pane?.pane_id || splitData.result?.new_pane_id;
 
         if (sidePaneId) {
-          execSync(`herdr pane run ${sidePaneId} "${STATUS_SIDEBAR_CMD}"`, {
+          execFileSync("herdr", ["pane", "run", sidePaneId, STATUS_SIDEBAR_CMD], {
             stdio: ["ignore", "pipe", "ignore"],
           });
         }
@@ -297,4 +297,4 @@ if (inHerdr) {
 
 // Fallback: lanzar opencode localmente con el agente designado
 console.log(`\n${ACCENT}✿${RESET} Abriendo OpenCode con ${designatedAgent}...`);
-execSync(`opencode --agent ${designatedAgent}`, { stdio: "inherit" });
+execFileSync("opencode", ["--agent", designatedAgent], { stdio: "inherit", shell: true });

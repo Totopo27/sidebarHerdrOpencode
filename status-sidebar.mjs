@@ -77,7 +77,21 @@ function resolveEngramDbPath() {
   return path.join(os.homedir(), ".engram", "engram.db");
 }
 
+function resolveModelsCachePath() {
+  const candidates = [
+    process.env.XDG_CACHE_HOME ? path.join(process.env.XDG_CACHE_HOME, "opencode", "models.json") : null,
+    path.join(os.homedir(), ".cache", "opencode", "models.json"),
+    path.join(os.homedir(), ".opencode", "models.json"),
+    path.join(os.homedir(), ".config", "opencode", "models.json"),
+  ];
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c;
+  }
+  return path.join(os.homedir(), ".cache", "opencode", "models.json");
+}
+
 const OPENCODE_DB_PATH = path.join(os.homedir(), ".local/share/opencode/opencode.db");
+const MODELS_CACHE_PATH = resolveModelsCachePath();
 const ENGRAM_DB_PATH = resolveEngramDbPath();
 
 // ============================================================================
@@ -199,6 +213,89 @@ function formatRelativeReset(resetAt, now = Date.now()) {
   const days = Math.floor(hours / 24);
   const remHours = hours % 24;
   return remHours > 0 ? `en ${days}d ${remHours}h` : `en ${days}d`;
+}
+
+/**
+ * Pacing de cuota inspirado en levi-qiao/herdr-agent-usage:
+ * Compara el % de cuota consumida contra la proporción de tiempo transcurrido en la ventana.
+ * Pacing = (100 - remPercent) - elapsedPercent
+ * Si pacing > +5%: quemando por encima del ritmo (↓ negativo o sobregiro).
+ * Si pacing < -5%: consumo holgado, buen margen (↑ positivo).
+ */
+function calculateQuotaPace(remPercent, windowType, resetAt, now = Date.now()) {
+  if (!resetAt || typeof remPercent !== "number") return null;
+  const resetMs = new Date(resetAt).getTime();
+  if (Number.isNaN(resetMs)) return null;
+
+  const windowMs = windowType === "weekly" ? 7 * 24 * 3600 * 1000 : 5 * 3600 * 1000;
+  const remainingMs = resetMs - now;
+  if (remainingMs <= 0 || remainingMs > windowMs) return null;
+
+  const elapsedMs = windowMs - remainingMs;
+  const elapsedPercent = (elapsedMs / windowMs) * 100;
+  const usedPercent = 100 - remPercent;
+  const paceDiff = Math.round(usedPercent - elapsedPercent);
+
+  // Formato compacto: ↓12% si va gastando más rápido de lo regenerable, ↑8% si tiene margen
+  if (paceDiff > 5) {
+    return { diff: paceDiff, text: `↓${paceDiff}%`, color: CORAL };
+  } else if (paceDiff < -5) {
+    const headroom = Math.abs(paceDiff);
+    return { diff: paceDiff, text: `↑${headroom}%`, color: MINT };
+  }
+  return { diff: paceDiff, text: `~0%`, color: GOLD };
+}
+
+let modelsCacheData = null;
+let modelsCacheMtime = 0;
+
+function resolveModelContextLimit(modelId, providerId = null) {
+  const fallback = 1_000_000;
+  if (!modelId) return fallback;
+
+  try {
+    if (fs.existsSync(MODELS_CACHE_PATH)) {
+      const stats = fs.statSync(MODELS_CACHE_PATH);
+      if (stats.size <= 8 * 1024 * 1024) { // Límite de seguridad de 8 MB
+        if (!modelsCacheData || stats.mtimeMs !== modelsCacheMtime) {
+          modelsCacheData = JSON.parse(fs.readFileSync(MODELS_CACHE_PATH, "utf8"));
+          modelsCacheMtime = stats.mtimeMs;
+        }
+      }
+    }
+
+    if (modelsCacheData) {
+      const cleanModel = modelId.split("/").pop().toLowerCase();
+      // 1. Si se conoce el proveedor exacto
+      if (providerId && modelsCacheData[providerId]?.models) {
+        for (const [mKey, mVal] of Object.entries(modelsCacheData[providerId].models)) {
+          if (mKey.toLowerCase() === cleanModel && mVal?.limit?.context) {
+            return mVal.limit.context;
+          }
+        }
+      }
+      // 2. Búsqueda en todos los proveedores registrados
+      for (const pKey of Object.keys(modelsCacheData)) {
+        const pModels = modelsCacheData[pKey]?.models;
+        if (pModels) {
+          for (const [mKey, mVal] of Object.entries(pModels)) {
+            if ((mKey.toLowerCase() === cleanModel || mKey.toLowerCase().includes(cleanModel) || cleanModel.includes(mKey.toLowerCase())) && mVal?.limit?.context) {
+              return mVal.limit.context;
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Fallback heurístico según familia de modelo
+  const lower = modelId.toLowerCase();
+  if (lower.includes("gemini") || lower.includes("flash") || lower.includes("pro")) return 1_000_000;
+  if (lower.includes("claude-3-5") || lower.includes("claude-3.5") || lower.includes("haiku")) return 200_000;
+  if (lower.includes("sonnet-4") || lower.includes("opus-4")) return 1_000_000;
+  if (lower.includes("deepseek")) return 1_000_000;
+  if (lower.includes("qwen")) return 128_000;
+  return fallback;
 }
 
 // ============================================================================
@@ -496,19 +593,24 @@ function getOpenCodeSessionData() {
       }
 
       // Tokens del turno activo desde session_message
+      // Siguiendo la fórmula exacta de levi-qiao/herdr-agent-usage y OpenCode 2:
+      // contextTokens = input + output + reasoning + cache.read + cache.write
       try {
         const lastMsg = db.prepare(`
-          SELECT data FROM session_message 
+          SELECT type, data FROM session_message 
           WHERE session_id = ? AND type = 'assistant' 
-          ORDER BY time_updated DESC LIMIT 1
+          ORDER BY seq DESC LIMIT 1
         `).get(targetSession.id);
 
         if (lastMsg) {
           const d = JSON.parse(lastMsg.data);
           if (d?.tokens) {
             const inp = d.tokens.input || 0;
-            const cache = d.tokens.cache?.read || 0;
-            result.activeTurnContextTokens = inp + cache;
+            const out = d.tokens.output || 0;
+            const reasoning = d.tokens.reasoning || 0;
+            const cacheRead = d.tokens.cache?.read || 0;
+            const cacheWrite = d.tokens.cache?.write || 0;
+            result.activeTurnContextTokens = inp + out + reasoning + cacheRead + cacheWrite;
           }
         }
       } catch {}
@@ -735,26 +837,34 @@ async function updateAccountQuota(account) {
       account.used5h = usedPercent;
       account.reset5h = formatRelativeReset(gemini5h?.resetTime || null);
 
+      const gemWkPct = Math.round(((geminiWk?.remainingFraction ?? 1) * 100));
+      const claudeWkPct = Math.round(((claudeWk?.remainingFraction ?? 1) * 100));
+      const claude5hPct = Math.round(((claude5h?.remainingFraction ?? 1) * 100));
+
       account.pools = [
         {
           label: "Gemini Wk",
-          percent: Math.round(((geminiWk?.remainingFraction ?? 1) * 100)),
+          percent: gemWkPct,
           reset: formatRelativeReset(geminiWk?.resetTime || null),
+          pace: calculateQuotaPace(gemWkPct, "weekly", geminiWk?.resetTime || null),
         },
         {
           label: "Gemini 5h",
           percent: remPercent,
           reset: account.reset5h,
+          pace: calculateQuotaPace(remPercent, "5h", gemini5h?.resetTime || null),
         },
         {
           label: "Claude Wk",
-          percent: Math.round(((claudeWk?.remainingFraction ?? 1) * 100)),
+          percent: claudeWkPct,
           reset: formatRelativeReset(claudeWk?.resetTime || null),
+          pace: calculateQuotaPace(claudeWkPct, "weekly", claudeWk?.resetTime || null),
         },
         {
           label: "Claude 5h",
-          percent: Math.round(((claude5h?.remainingFraction ?? 1) * 100)),
+          percent: claude5hPct,
           reset: formatRelativeReset(claude5h?.resetTime || null),
+          pace: calculateQuotaPace(claude5hPct, "5h", claude5h?.resetTime || null),
         },
       ];
 
@@ -1259,14 +1369,14 @@ function render() {
 
   // 3. Contexto Card
   lines.push(drawTop(`${BOLD}${GOLD}Contexto${RESET}`));
-  const contextLimit = 1_000_000;
+  const contextLimit = resolveModelContextLimit(opencode.model, opencode.agent);
   const currentTokens = opencode.activeTurnContextTokens > 0
     ? opencode.activeTurnContextTokens
     : 32_000;
 
   const contextPercent = Math.max(0.1, ((currentTokens / contextLimit) * 100));
-  const isSaturated = currentTokens >= 800_000;
-  const isMature = currentTokens >= 500_000 && !isSaturated;
+  const isSaturated = currentTokens >= (contextLimit * 0.8);
+  const isMature = currentTokens >= (contextLimit * 0.5) && !isSaturated;
 
   let leftTokensStr;
   let rightContextStatus;
@@ -1407,8 +1517,9 @@ function render() {
       for (const p of acc.pools) {
         const threshold = getQuotaThreshold(p.percent);
         const pctFmt = `${BOLD}${threshold.color(String(p.percent).padStart(3) + "%")}${RESET}`;
+        const paceStr = p.pace ? ` ${p.pace.color}${p.pace.text}${RESET}` : "";
         const resetStr = p.reset ? ` ${TEXT_DIM}${p.reset}${RESET}` : "";
-        const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label}${RESET} ${pctFmt}${resetStr}`;
+        const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label}${RESET} ${pctFmt}${paceStr}${resetStr}`;
         const rightGauge = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
         lines.push(drawRow(leftCol, rightGauge));
       }
