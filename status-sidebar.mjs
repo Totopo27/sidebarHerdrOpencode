@@ -1332,7 +1332,17 @@ function render() {
 
   const renderGaugeInline = (percent, availableCells, thresholdColor) => {
     const clamped = Math.max(0, Math.min(100, percent));
-    const filledCount = Math.round((clamped / 100) * availableCells);
+    const rounded = Math.round(clamped);
+    let filledCount = Math.round((rounded / 100) * availableCells);
+    // Regla de clamping visual (1..=99% de Levi Qiao):
+    // Nunca dibuja 100% lleno si falta algo por gastar, ni 0% vacío si queda cuota
+    if (rounded > 0 && rounded < 100) {
+      filledCount = Math.max(1, Math.min(availableCells - 1, filledCount));
+    } else if (rounded === 0) {
+      filledCount = 0;
+    } else {
+      filledCount = availableCells;
+    }
     const emptyCount = Math.max(0, availableCells - filledCount);
     const colFn = typeof thresholdColor === "function" ? thresholdColor : (s) => `${thresholdColor}${s}${RESET}`;
     return `${colFn("▰".repeat(filledCount))}${TEXT_DIM}${"▱".repeat(emptyCount)}${RESET}`;
@@ -1466,12 +1476,12 @@ function render() {
         ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(5)}${RESET}`
         : `${TEXT_MUTED}${acc.prefix.padEnd(5)}${RESET}`;
 
-      const pctDisplay = `${BOLD}\x1b[38;2;${pctColor.slice(7)}${String(acc.rem5h).padStart(3)}%${RESET}`;
-      const statusSuffix = statusNote ? ` ${statusNote}` : "";
-      const leftCol = `${marker} ${icon} ${pfxDisplay} ${pctDisplay}${statusSuffix}`;
-      const rightGauge = renderGaugeInline(acc.rem5h, miniBarCells, (s) => `\x1b[38;2;${pctColor.slice(7)}${s}${RESET}`);
+      const pctDisplay = `${BOLD}${pctColor}${String(acc.rem5h).padStart(3)}%${RESET}`;
+      const bar = renderGaugeInline(acc.rem5h, 10, pctColor);
+      const leftCol = `${marker} ${icon} ${pfxDisplay} ${bar} ${pctDisplay}`;
+      const rightCol = statusNote;
 
-      lines.push(drawRow(leftCol, rightGauge));
+      lines.push(drawRow(leftCol, rightCol));
     }
   }
 
@@ -1513,15 +1523,16 @@ function render() {
         lines.push(drawRow(`${AMBER}! ${acc.errorMsg}${RESET}`));
       }
 
-      const poolGaugeCells = Math.max(8, Math.min(14, innerWidth - 28));
+      const poolGaugeCells = 8;
       for (const p of acc.pools) {
         const threshold = getQuotaThreshold(p.percent);
         const pctFmt = `${BOLD}${threshold.color(String(p.percent).padStart(3) + "%")}${RESET}`;
-        const paceStr = p.pace ? ` ${p.pace.color}${p.pace.text}${RESET}` : "";
-        const resetStr = p.reset ? ` ${TEXT_DIM}${p.reset}${RESET}` : "";
-        const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label}${RESET} ${pctFmt}${paceStr}${resetStr}`;
-        const rightGauge = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
-        lines.push(drawRow(leftCol, rightGauge));
+        const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
+        const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
+        const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
+        const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
+        const rightCol = `${paceStr}${resetStr}`.trim();
+        lines.push(drawRow(leftCol, rightCol));
       }
 
       lines.push(drawBottom());
