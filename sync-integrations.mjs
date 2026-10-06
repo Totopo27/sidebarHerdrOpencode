@@ -131,20 +131,79 @@ export async function syncIntegrationsAndOrchestrators() {
 
   // 2. Auditar y auto-asignar modelos faltantes a los orquestadores SDD
   let repairedOrchestratorsCount = 0;
-  if (rawConfig.agent && typeof rawConfig.agent === "object") {
-    for (const [agentName, agentDef] of Object.entries(rawConfig.agent)) {
+
+  // Soportar tanto "agent" como "agents" para compatibilidad con V1, V2 y Gentle AI
+  const agentSections = [];
+  if (rawConfig.agent && typeof rawConfig.agent === "object") agentSections.push(rawConfig.agent);
+  if (rawConfig.agents && typeof rawConfig.agents === "object") agentSections.push(rawConfig.agents);
+
+  // Lista de cuentas conocidas detectadas en los modelos remotos
+  const knownAccountPrefixes = new Set();
+  for (const mId of Object.keys(modelsMap)) {
+    if (mId.includes("/")) {
+      knownAccountPrefixes.add(mId.split("/")[0]);
+    }
+  }
+
+  for (const section of agentSections) {
+    for (const [agentName, agentDef] of Object.entries(section)) {
       if (agentName.startsWith("sdd-orchestrator-") && agentDef) {
         if (!agentDef.model || typeof agentDef.model !== "string" || !agentDef.model.trim()) {
-          const profilePrefix = agentName.replace("sdd-orchestrator-", "").trim();
-          const candidateModelKey = `${profilePrefix}/gemini-3.8-flash-high`;
-          const genericModelKey = "gemini-3.8-flash-high";
+          const profile = agentName.replace("sdd-orchestrator-", "").trim().toLowerCase();
 
-          if (modelsMap[candidateModelKey]) {
-            agentDef.model = `cliproxy/${candidateModelKey}`;
+          // Detección inteligente de familia de modelo según el nombre del orquestador o sus subagentes
+          let assignedModelKey = null;
+
+          if (profile.includes("claude") || profile.includes("opus")) {
+            // Prioridad para perfiles Claude: Claude Opus 4.6 (thinking)
+            if (knownAccountPrefixes.has(profile) && modelsMap[`${profile}/claude-opus-4-6-thinking`]) {
+              assignedModelKey = `${profile}/claude-opus-4-6-thinking`;
+            } else if (modelsMap["claude-opus-4-6-thinking"]) {
+              assignedModelKey = "claude-opus-4-6-thinking";
+            } else if (modelsMap["claude-sonnet-4-6"]) {
+              assignedModelKey = "claude-sonnet-4-6";
+            }
+          } else if (profile.includes("sonnet")) {
+            if (knownAccountPrefixes.has(profile) && modelsMap[`${profile}/claude-sonnet-4-6`]) {
+              assignedModelKey = `${profile}/claude-sonnet-4-6`;
+            } else if (modelsMap["claude-sonnet-4-6"]) {
+              assignedModelKey = "claude-sonnet-4-6";
+            }
+          } else if (profile.includes("gpt") || profile.includes("oss")) {
+            if (knownAccountPrefixes.has(profile) && modelsMap[`${profile}/gpt-oss-120b-medium`]) {
+              assignedModelKey = `${profile}/gpt-oss-120b-medium`;
+            } else if (modelsMap["gpt-oss-120b-medium"]) {
+              assignedModelKey = "gpt-oss-120b-medium";
+            }
+          } else {
+            // Familia Gemini o perfiles asociados directamente al nombre de cuenta (gianni, tavo, etc.)
+            const candidateModelKey = `${profile}/gemini-3.8-flash-high`;
+            if (modelsMap[candidateModelKey]) {
+              assignedModelKey = candidateModelKey;
+            } else if (modelsMap["gemini-3.8-flash-high"]) {
+              assignedModelKey = "gemini-3.8-flash-high";
+            }
+          }
+
+          if (assignedModelKey) {
+            agentDef.model = `cliproxy/${assignedModelKey}`;
             repairedOrchestratorsCount++;
-          } else if (modelsMap[genericModelKey]) {
-            agentDef.model = `cliproxy/${genericModelKey}`;
-            repairedOrchestratorsCount++;
+
+            // Si el system prompt tiene la tabla de 'Model Assignments', actualizar la fila del orchestrator
+            if (typeof agentDef.system === "string" && agentDef.system.includes("## Model Assignments")) {
+              agentDef.system = agentDef.system.replace(
+                /(\|\s*orchestrator\s*\|\s*)(—|[^|]+)(\s*\|\s*Coordinates,\s*makes decisions\s*\|)/,
+                `$1cliproxy/${assignedModelKey}$3`
+              );
+            }
+          }
+        } else if (typeof agentDef.system === "string" && agentDef.system.includes("## Model Assignments") && agentDef.model) {
+          // Si el agente ya tenía model pero la tabla en el prompt aún tenía "—"
+          if (agentDef.system.includes("| orchestrator | — | Coordinates, makes decisions |")) {
+            agentDef.system = agentDef.system.replace(
+              "| orchestrator | — | Coordinates, makes decisions |",
+              `| orchestrator | ${agentDef.model} | Coordinates, makes decisions |`
+            );
           }
         }
       }
