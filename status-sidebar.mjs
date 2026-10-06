@@ -21,6 +21,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { execSync, execFileSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
+import { syncIntegrationsAndOrchestrators } from "./sync-integrations.mjs";
 
 // ============================================================================
 // PALETA LINEAR / TUI (Truecolor 24-bit ANSI)
@@ -1368,6 +1369,22 @@ function migrateCriticalSessions() {
   return executeDatabaseMigration(targetPrefix);
 }
 
+let isSyncingIntegrations = false;
+async function triggerSyncIntegrations() {
+  if (isSyncingIntegrations) return;
+  isSyncingIntegrations = true;
+  setFlashNotice("⏳ Sincronizando modelos y orquestadores...");
+  try {
+    const res = await syncIntegrationsAndOrchestrators();
+    await fetchQuotas(true);
+    setFlashNotice(`✓ Sincronizado: ${res.totalModels} modelos (+${res.addedModels} nuevos), ${res.repairedOrchestrators} orquestadores auditados`);
+  } catch (err) {
+    setFlashNotice(`! Error sincronizando: ${err.message}`);
+  } finally {
+    isSyncingIntegrations = false;
+  }
+}
+
 function setFlashNotice(msg, durationMs = 4000) {
   flashNotice = msg;
   if (flashNoticeTimer) clearTimeout(flashNoticeTimer);
@@ -1649,6 +1666,15 @@ function render() {
 
         lines.push(drawRow(leftCol, rightCol));
       }
+      lines.push(drawDivider());
+      const syncBtnLine = lines.length;
+      lines.push(drawRow(`${CYAN}⚡ [sincronizar]${RESET}`));
+      cardLineBounds.push({
+        id: "integraciones_sync",
+        startLine: syncBtnLine,
+        endLine: syncBtnLine,
+        actionType: "sync_integrations"
+      });
     }
   }
 
@@ -1843,6 +1869,13 @@ if (process.stdin.isTTY) {
         if (btn === 0) { // Clic izquierdo
           const clickedLine = (y - 1) + scrollOffset;
 
+          // Verificar si el clic fue en la acción especial de sincronización
+          const syncHit = cardLineBounds.find((c) => c.actionType === "sync_integrations" && clickedLine === c.startLine);
+          if (syncHit) {
+            triggerSyncIntegrations();
+            return;
+          }
+
           // Verificar si el clic fue en la acción especial de abrir carpeta
           const actionHit = cardLineBounds.find((c) => c.actionLine === clickedLine && c.actionPath);
           if (actionHit) {
@@ -1882,6 +1915,8 @@ if (process.stdin.isTTY) {
       cleanupAndExit();
     } else if (key === "r" || key === "R") {
       fetchQuotas(true); // Forzar actualización de TODAS las cuentas bajo demanda
+    } else if (key === "s" || key === "S") {
+      triggerSyncIntegrations(); // Sincronizar catálogo de modelos y auditar orquestadores SDD
     } else if (key === "d" || key === "D") {
       releaseInactiveSessions(); // Deseleccionar/archivar sesiones huérfanas en desuso
     } else if (key === "x" || key === "X") {
