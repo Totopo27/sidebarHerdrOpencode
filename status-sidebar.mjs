@@ -531,7 +531,7 @@ function openInFileExplorer(targetPath) {
     } else {
       execFileSync("xdg-open", [absPath], { stdio: "ignore" });
     }
-    setFlashNotice(`✔ Abierto en explorador: ${path.basename(absPath)}`);
+    setFlashNotice(`+ Abierto en explorador: ${path.basename(absPath)}`);
   } catch (err) {
     setFlashNotice(`! Error abriendo carpeta: ${err.message}`);
   }
@@ -1160,7 +1160,7 @@ function releaseInactiveSessions() {
 
     if (closedCount > 0) {
       const releasedListStr = Array.from(releasedPrefixes).join(", ") || "cuentas secundarias";
-      setFlashNotice(`✓ ${closedCount} sesión(es) archivadas. Liberadas: [${releasedListStr}]`);
+      setFlashNotice(`[!] ${closedCount} sesion(es) archivadas. Liberadas: [${releasedListStr}]`);
 
       // Trazabilidad en Engram de la limpieza
       const engramBin = process.env.LOCALAPPDATA
@@ -1282,7 +1282,7 @@ function executeDatabaseMigration(targetPrefix) {
     db.close();
 
     if (totalMigrated > 0) {
-      setFlashNotice(`✓ ${totalMigrated} sesion(es) migradas en vivo a ${targetPrefix}!`);
+      setFlashNotice(`[ok] ${totalMigrated} sesion(es) migradas en vivo a ${targetPrefix}!`);
 
       // Snapshot rico en Engram con contexto ODD / Gentle Shell / Checkpoint
       const engramBin = process.env.LOCALAPPDATA
@@ -1362,7 +1362,7 @@ function migrateCriticalSessions() {
   // Si el agente está en pleno streaming / working, encolar para no matar el turno
   if (sessionData.agentStatus === "working") {
     pendingMigrationTarget = targetPrefix;
-    setFlashNotice(`⏳ Agente trabajando: rotación a ${targetPrefix} programada para el final del turno.`, 6000);
+    setFlashNotice(`... Agente trabajando: rotacion a ${targetPrefix} programada para el final del turno.`, 6000);
     return 0;
   }
 
@@ -1373,11 +1373,11 @@ let isSyncingIntegrations = false;
 async function triggerSyncIntegrations() {
   if (isSyncingIntegrations) return;
   isSyncingIntegrations = true;
-  setFlashNotice("⏳ Sincronizando modelos y orquestadores...");
+  setFlashNotice("... Sincronizando modelos y orquestadores...");
   try {
     const res = await syncIntegrationsAndOrchestrators();
     await fetchQuotas(true);
-    setFlashNotice(`✓ Sincronizado: ${res.totalModels} modelos (+${res.addedModels} nuevos), ${res.repairedOrchestrators} orquestadores auditados`);
+    setFlashNotice(`[ok] Sincronizado: ${res.totalModels} modelos (+${res.addedModels} nuevos), ${res.repairedOrchestrators} orquestadores auditados`);
   } catch (err) {
     setFlashNotice(`! Error sincronizando: ${err.message}`);
   } finally {
@@ -1427,7 +1427,7 @@ function render() {
   cardLineBounds = [];
 
   const drawTop = (titleFormatted, isCollapsed = false) => {
-    const icon = isCollapsed ? "▲" : "▼";
+    const icon = isCollapsed ? "+" : "-";
     const iconBadge = `${TEXT_DIM}[${RESET}${TEXT_MUTED}${icon}${RESET}${TEXT_DIM}]${RESET}`;
     const maxTitle = width - 12;
     let cleanTitle = titleFormatted;
@@ -1494,25 +1494,25 @@ function render() {
   const lines = [];
 
   // 1. Encabezado Técnico de Marca (Linear Aesthetic)
-  const bannerLeft = `${ACCENT_PRIMARY}✿ OPENCODE${RESET}`;
-  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}✿${RESET}`;
-  const bannerRaw = "✿ OPENCODE · GENTLE-AI ✿";
+  const bannerLeft = `${ACCENT_PRIMARY}:: OPENCODE${RESET}`;
+  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}::${RESET}`;
+  const bannerRaw = ":: OPENCODE · GENTLE-AI ::";
   const bannerPad = Math.max(0, Math.floor((width - stringWidth(bannerRaw)) / 2));
   lines.push(`${" ".repeat(bannerPad)}${bannerLeft} ${bannerRight}`);
 
-  // 2. ✿ Estado Card (con Indicador Petal / Working State de Gentle-Shell)
+  // 2. Estado Card (con Indicador Petal / Working State de Gentle-Shell)
   const isWorking = opencode.agentStatus === "working";
   const petalIndicator = isWorking
-    ? `${BOLD}${AMBER}◐ WORKING${RESET}`
-    : `${TEXT_DIM}○ idle${RESET}`;
-  const estadoTop = `${ACCENT_PRIMARY}✿${RESET} ${BOLD}${GOLD}Estado${RESET} ${TEXT_DIM}·${RESET} ${petalIndicator}`;
+    ? `${BOLD}${AMBER}>> WORKING${RESET}`
+    : `${TEXT_DIM}-- idle${RESET}`;
+  const estadoTop = `${BOLD}${GOLD}Estado${RESET} ${TEXT_DIM}·${RESET} ${petalIndicator}`;
   const estadoStart = lines.length;
   lines.push(drawTop(estadoTop, collapsedCards.estado));
   if (!collapsedCards.estado) {
     const shortProject = folder.length > 20 ? folder.slice(0, 18) + "…" : folder;
     lines.push(drawRow(`${GOLD}Proyecto${RESET}`, `${TEXT_PRIMARY}~/.../${shortProject}${RESET}`));
     const dirtyBadge = git.isClean ? `${MINT}limpio${RESET}` : `${AMBER}±${git.modified + git.staged}${RESET}`;
-    lines.push(drawRow(`${GOLD}Rama${RESET}`, `${CYAN}ᛦ ${git.branch}${RESET} ${dirtyBadge}`));
+    lines.push(drawRow(`${GOLD}Rama${RESET}`, `${CYAN}# ${git.branch}${RESET} ${dirtyBadge}`));
     const activeModelDisplay = `${ACCENT_PRIMARY}${opencode.modelShort}${RESET} ${GOLD}(high)${RESET}`;
     lines.push(drawRow(`${GOLD}Modelo${RESET}`, activeModelDisplay));
     
@@ -1520,7 +1520,7 @@ function render() {
     const mcpCountStr = mcpList.length > 0 ? `${mcpList.length} MCPs` : "0 MCPs";
     const activeProfLabels = Array.from(activePrefixes).map((p) => `${ACCENT_PINK}*${RESET} ${MINT}${p}${RESET}`).join(" ") || `${TEXT_MUTED}default${RESET}`;
     const subVitals = `${ACCENT_PRIMARY}mem:${RESET} ${TEXT_PRIMARY}${engram.project}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_MUTED}${mcpCountStr}${RESET} ${TEXT_DIM}·${RESET} ${activeProfLabels}`;
-    lines.push(drawRow(subVitals, `${ACCENT_PINK}▸${RESET}`));
+    lines.push(drawRow(subVitals, `${ACCENT_PINK}>${RESET}`));
   }
   lines.push(drawBottom());
   cardLineBounds.push({ id: "estado", startLine: estadoStart, endLine: lines.length - 1 });
@@ -1545,23 +1545,23 @@ function render() {
     if (isSaturated) {
       gaugeColor = CORAL;
       leftTokensStr = `${BOLD}${CORAL}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${CORAL}● Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+      rightContextStatus = `${CORAL}* Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
     } else if (isMature) {
       gaugeColor = AMBER;
       leftTokensStr = `${BOLD}${AMBER}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${AMBER}● Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+      rightContextStatus = `${AMBER}* Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
     } else {
       const contextThreshold = getQuotaThreshold(100 - contextPercent);
       gaugeColor = contextThreshold.color;
       leftTokensStr = `${BOLD}${contextThreshold.color(formatTokenCount(currentTokens))}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${contextThreshold.color("●")} ${BOLD}${contextThreshold.color(`Óptimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
+      rightContextStatus = `${contextThreshold.color("*")} ${BOLD}${contextThreshold.color(`Optimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
     }
 
     lines.push(drawRow(leftTokensStr, rightContextStatus));
     lines.push(drawRow(renderGaugeInline(contextPercent, innerWidth, gaugeColor)));
     const inTokens = opencode.tokensInput > 0 ? opencode.tokensInput : 1_400_000;
     const outTokens = opencode.tokensOutput > 0 ? opencode.tokensOutput : 12_600;
-    const leftBreakdown = `${TEXT_DIM}▲${RESET} ${TEXT_PRIMARY}${formatTokenCount(inTokens)}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_DIM}▼${RESET} ${TEXT_PRIMARY}${formatTokenCount(outTokens)}${RESET}`;
+    const leftBreakdown = `${TEXT_DIM}^${RESET} ${TEXT_PRIMARY}${formatTokenCount(inTokens)}${RESET} ${TEXT_DIM}·${RESET} ${TEXT_DIM}v${RESET} ${TEXT_PRIMARY}${formatTokenCount(outTokens)}${RESET}`;
     const rightCost = `${GOLD}Costo${RESET} ${TEXT_PRIMARY}${formatCost(opencode.cost)}${RESET}`;
     lines.push(drawRow(leftBreakdown, rightCost));
     if (isMature || isSaturated) {
@@ -1574,7 +1574,7 @@ function render() {
   // 3B. Proyecto / Archivos Card (2 Niveles, colapsada por defecto)
   const proyectoStart = lines.length;
   const projectStatsBadge = `${TEXT_DIM}${projectTreeData.totalDirs}d · ${projectTreeData.totalFiles}f${RESET}`;
-  const projectCardTitle = `${ACCENT_PRIMARY}⌂${RESET} ${BOLD}${GOLD}Proyecto${RESET} ${TEXT_DIM}·${RESET} ${CYAN}${folder}${RESET} ${projectStatsBadge}`;
+  const projectCardTitle = `${ACCENT_PRIMARY}~${RESET} ${BOLD}${GOLD}Proyecto${RESET} ${TEXT_DIM}·${RESET} ${CYAN}${folder}${RESET} ${projectStatsBadge}`;
   lines.push(drawTop(projectCardTitle, collapsedCards.proyecto));
 
   if (!collapsedCards.proyecto) {
@@ -1587,7 +1587,7 @@ function render() {
     } else {
       for (const item of projectTreeData.tree) {
         if (item.isDir) {
-          const dirIcon = `${CYAN}▸ /${RESET}`;
+          const dirIcon = `${CYAN}> /${RESET}`;
           const dirCountBadge = `${TEXT_DIM}(${item.children.length})${RESET}`;
           lines.push(drawRow(`${dirIcon} ${TEXT_PRIMARY}${item.name}/${RESET} ${dirCountBadge}`));
 
@@ -1626,7 +1626,7 @@ function render() {
   }
   
   const integracionesStart = lines.length;
-  lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Integraciones${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`, collapsedCards.integraciones));
+  lines.push(drawTop(`${GOLD}Integraciones${RESET} ${TEXT_DIM}·${RESET} ${intTitleRight}`, collapsedCards.integraciones));
 
   if (!collapsedCards.integraciones) {
     if (accountsList.length === 0) {
@@ -1635,9 +1635,9 @@ function render() {
       for (const acc of accountsList) {
         // Detección multi-sesión: si la cuenta está activa en cualquier sesión abierta, se marca con ▸
         const isActive = activePrefixes.has(acc.prefix.toLowerCase());
-        const marker = isActive ? `${ACCENT_PINK}▸${RESET}` : " ";
+        const marker = isActive ? `${ACCENT_PINK}>${RESET}` : " ";
         
-        let icon = `${MINT}●${RESET}`;
+        let icon = `${MINT}*${RESET}`;
         let pctColor = MINT;
         let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
 
@@ -1668,7 +1668,7 @@ function render() {
       }
       lines.push(drawDivider());
       const syncBtnLine = lines.length;
-      lines.push(drawRow(`${CYAN}⚡ [sincronizar]${RESET}`));
+      lines.push(drawRow(`${CYAN}>> [sincronizar]${RESET}`));
       cardLineBounds.push({
         id: "integraciones_sync",
         startLine: syncBtnLine,
@@ -1687,7 +1687,7 @@ function render() {
     }
     const targetHealthy = getBestHealthyTargetPrefix();
     if (pendingMigrationTarget) {
-      lines.push(drawRow(`${BOLD}${AMBER}⏳ Rotación a ${pendingMigrationTarget} programada al terminar turno${RESET}`));
+      lines.push(drawRow(`${BOLD}${AMBER}... Rotacion a ${pendingMigrationTarget} programada al terminar turno${RESET}`));
     }
     for (const ca of alertAccounts) {
       if (ca.isCritical) {
@@ -1712,7 +1712,7 @@ function render() {
     if (acc.pools && acc.pools.length > 0) {
       const activeTag = activePrefixes.has(acc.prefix.toLowerCase()) ? " (activa)" : "";
       const poolsStart = lines.length;
-      lines.push(drawTop(`${ACCENT_PRIMARY}✿${RESET} ${GOLD}Antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`, collapsedCards.pools));
+      lines.push(drawTop(`${GOLD}Antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`, collapsedCards.pools));
 
       if (!collapsedCards.pools) {
         if (acc.hasError) {
@@ -1726,7 +1726,7 @@ function render() {
           const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
           const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
           const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-          const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
+          const leftCol = `${threshold.color("*")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
           const rightCol = `${paceStr}${resetStr}`.trim();
           lines.push(drawRow(leftCol, rightCol));
         }
@@ -1740,15 +1740,15 @@ function render() {
   // 6. ᛦ Gráfico Git & Gentle Attributed Changes Card
   const agentFilesCount = opencode.attributedChanges.files.size;
   const agentChangesTitle = agentFilesCount > 0
-    ? `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}Cambios${RESET} ${TEXT_DIM}· ${agentFilesCount} por agente${RESET}`
-    : `${ACCENT_PRIMARY}ᛦ${RESET} ${BOLD}${GOLD}Git y Cambios${RESET}`;
+    ? `${BOLD}${GOLD}Cambios${RESET} ${TEXT_DIM}· ${agentFilesCount} por agente${RESET}`
+    : `${BOLD}${GOLD}Git y Cambios${RESET}`;
   const gitStart = lines.length;
   lines.push(drawTop(agentChangesTitle, collapsedCards.git));
 
   if (!collapsedCards.git) {
     const gitBadges = git.isClean
-      ? `${MINT}✔ limpio${RESET}`
-      : `${AMBER}● ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
+      ? `${MINT}ok limpio${RESET}`
+      : `${AMBER}* ${git.modified} mod${RESET} ${TEXT_DIM}·${RESET} ${MAGENTA}?${git.untracked}${RESET}`;
     lines.push(drawRow(`${CYAN}${git.branch}${RESET}`, gitBadges));
 
     if (git.graphLines.length > 0) {
@@ -1766,8 +1766,8 @@ function render() {
       : `${TEXT_DIM}git:${RESET} ${MINT}limpio${RESET}`;
 
     const agentSummary = agentFilesCount > 0
-      ? `${ACCENT_PRIMARY}✎ agente:${RESET} ${MINT}${agentFilesCount} archivos${RESET} ${TEXT_DIM}(+${opencode.attributedChanges.additions} -${opencode.attributedChanges.deletions})${RESET}`
-      : `${ACCENT_PRIMARY}✎ agente:${RESET} ${TEXT_DIM}0 archivos${RESET}`;
+      ? `${ACCENT_PRIMARY}ag:${RESET} ${MINT}${agentFilesCount} archivos${RESET} ${TEXT_DIM}(+${opencode.attributedChanges.additions} -${opencode.attributedChanges.deletions})${RESET}`
+      : `${ACCENT_PRIMARY}ag:${RESET} ${TEXT_DIM}0 archivos${RESET}`;
 
     lines.push(drawRow(changesSummary, agentSummary));
   }
@@ -1777,15 +1777,15 @@ function render() {
 
   // 7. Engram Card
   const engramStart = lines.length;
-  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}▲${RESET}`, collapsedCards.engram));
+  lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}^${RESET}`, collapsedCards.engram));
   if (!collapsedCards.engram) {
-    const localOnlineStatus = engram.online ? `${MINT}● En línea${RESET}` : `${CORAL}○ Caído${RESET}`;
+    const localOnlineStatus = engram.online ? `${MINT}* En linea${RESET}` : `${CORAL}o Caido${RESET}`;
     lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
     if (engram.cloudHost) {
-      const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
+      const syncStatus = engram.enrolled ? `${MINT}* Enrolado${RESET}` : `${TEXT_DIM}o No sinc${RESET}`;
       lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
     } else {
-      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}o no configurado${RESET}`));
     }
   }
   lines.push(drawBottom());
@@ -1798,8 +1798,8 @@ function render() {
   lines.push(drawTop(toolsTitleFmt, collapsedCards.tools));
 
   if (!collapsedCards.tools) {
-    const pRead = `${MAGENTA}✎ ${toolsCount.read} lecturas${RESET}`;
-    const pWrite = `${CYAN}✎ ${toolsCount.write} escrituras${RESET}`;
+    const pRead = `${MAGENTA}@ ${toolsCount.read} lecturas${RESET}`;
+    const pWrite = `${CYAN}@ ${toolsCount.write} escrituras${RESET}`;
     const pBash = `${MINT}>_ ${toolsCount.bash} bash${RESET}`;
     const pEngram = `${CORAL}mem: ${toolsCount.engram}${RESET}`;
     lines.push(drawRow(`${pRead}  ${pWrite}  ${pBash}`, pEngram));
@@ -1818,7 +1818,7 @@ function render() {
       lines.push(drawRow(`${TEXT_DIM}Sin servidores MCP configurados${RESET}`));
     } else {
       for (const mcp of mcpList) {
-        const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
+        const statusDot = mcp.enabled ? `${MINT}*${RESET}` : `${AMBER}o${RESET}`;
         const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
         const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
         const statusText = mcp.enabled ? `${MINT}en línea${RESET}` : `${TEXT_MUTED}desactivado${RESET}`;

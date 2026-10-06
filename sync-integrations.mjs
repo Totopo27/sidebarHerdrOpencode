@@ -232,7 +232,7 @@ export async function syncIntegrationsAndOrchestrators() {
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename || "")) {
   syncIntegrationsAndOrchestrators()
     .then((res) => {
-      console.log(`✓ Sincronización exitosa: ${res.totalModels} modelos disponibles (+${res.addedModels} nuevos), ${res.repairedOrchestrators} orquestadores auditados.`);
+      console.log(`[ok] Sincronizacion exitosa: ${res.totalModels} modelos disponibles (+${res.addedModels} nuevos), ${res.repairedOrchestrators} orquestadores auditados.`);
     })
     .catch((err) => {
       console.error(`! Error en sincronización: ${err.message}`);

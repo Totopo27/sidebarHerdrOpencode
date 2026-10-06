@@ -51,7 +51,7 @@ try {
   }
 } catch {}
 
-console.log(`\n${ACCENT}✿ [snew]${RESET} ${BOLD}Iniciando Handover de Ingeniería para:${RESET} ${CYAN}${projectName}${RESET}`);
+console.log(`\n${ACCENT}:: [snew]${RESET} ${BOLD}Iniciando Handover de Ingenieria para:${RESET} ${CYAN}${projectName}${RESET}`);
 
 // ============================================================================
 // 1. CAPTURA DE CONTEXTO SALIENTE & ARCHIVADO LIMPIO (GENTLE SHELL ODD)
@@ -126,7 +126,7 @@ if (fs.existsSync(OPENCODE_DB_PATH)) {
       // Archivar limpiamente la sesión saliente para liberar la cuenta en el HUD
       const now = Date.now();
       db.prepare("UPDATE session_v2 SET time_archived = ? WHERE id = ?").run(now, activeRow.id);
-      console.log(`  ${MINT}✓${RESET} Sesión anterior archivada [${activeRow.id.slice(0, 8)}…] (liberando ${outgoingContext.accountPrefix}).`);
+      console.log(`  ${MINT}[ok]${RESET} Sesión anterior archivada [${activeRow.id.slice(0, 8)}…] (liberando ${outgoingContext.accountPrefix}).`);
     }
 
     db.close();
@@ -157,7 +157,7 @@ if (fs.existsSync(engramBin)) {
       "--project",
       projectName,
     ]);
-    console.log(`  ${MINT}✓${RESET} Contexto de Handover registrado en Engram (${outgoingContext.attributedFiles.length} archivos atribuidos).`);
+    console.log(`  ${MINT}[ok]${RESET} Contexto de Handover registrado en Engram (${outgoingContext.attributedFiles.length} archivos atribuidos).`);
   } catch {}
 }
 
@@ -241,7 +241,7 @@ const bestAccount = await pickHealthiestAccount();
 const targetPrefix = typeof bestAccount === "object" ? bestAccount.prefix : bestAccount;
 const remQuotaPct = typeof bestAccount === "object" ? `${bestAccount.rem5h}% libre` : "disponible";
 
-console.log(`  ${MINT}✓${RESET} Cuenta seleccionada para nueva sesión: ${BOLD}${targetPrefix}${RESET} (${remQuotaPct}).`);
+console.log(`  ${MINT}[ok]${RESET} Cuenta seleccionada para nueva sesion: ${BOLD}${targetPrefix}${RESET} (${remQuotaPct}).`);
 
 // ============================================================================
 // 3. APERTURA DE ENTORNO EN HERDR (CON MODELO / AGENTE DESIGNADO)
@@ -264,7 +264,7 @@ if (inHerdr) {
     const newTabId = tabData.result?.tab?.tab_id;
 
     if (newTabId) {
-      console.log(`  ${MINT}✓${RESET} Nueva pestaña creada en Herdr (${folder}).`);
+      console.log(`  ${MINT}[ok]${RESET} Nueva pestana creada en Herdr (${folder}).`);
 
       const listRaw = execSync("herdr pane list", { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
       const listData = JSON.parse(listRaw);
@@ -289,12 +289,12 @@ if (inHerdr) {
           });
         }
       }
-      console.log(`\n${MINT}🚀 Handover completado con éxito.${RESET}\n`);
+      console.log(`\n${MINT}>> Handover completado con exito.${RESET}\n`);
       process.exit(0);
     }
   } catch (err) {}
 }
 
 // Fallback: lanzar opencode localmente con el agente designado
-console.log(`\n${ACCENT}✿${RESET} Abriendo OpenCode con ${designatedAgent}...`);
+console.log(`\n${ACCENT}::${RESET} Abriendo OpenCode con ${designatedAgent}...`);
 execFileSync("opencode", ["--agent", designatedAgent], { stdio: "inherit", shell: true });
