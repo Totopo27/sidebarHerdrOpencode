@@ -1012,7 +1012,7 @@ async function updateAccountQuota(account) {
 
 /**
  * Estrategia de Refresco Inteligente (Snapshot + Reactive Active Polling):
- * - Al arrancar (isInitialFetch) o al presionar 'r' (forceAll): consulta las 5 cuentas para pintar el panorama general.
+ * - Al arrancar (isInitialFetch) o al presionar 'r' (forceAll): consulta todas las cuentas para pintar el panorama general.
  * - En los intervalos automáticos de 2m: SOLO consulta las cuentas activas en uso en alguna sesión.
  */
 async function fetchQuotas(forceAll = false) {
@@ -1596,11 +1596,12 @@ function render() {
     actionPath: projectTreeData.rootPath,
   });
 
-  // 5. ✿ Integraciones Card (TODAS LAS 5 CUENTAS + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
+  // 5. ✿ Integraciones Card (DINÁMICO SEGÚN accountsList.length + MULTI-▸ SESIÓN + AVISO 70% Y CRÍTICO 85%)
   const criticalAccounts = accountsList.filter((a) => a.isCritical);
   const warningAccounts = accountsList.filter((a) => a.isWarning);
 
-  let intTitleRight = `${TEXT_DIM}5 cuentas${RESET}`;
+  const totalAccountsCount = accountsList.length;
+  let intTitleRight = `${TEXT_DIM}${totalAccountsCount} cuenta${totalAccountsCount === 1 ? "" : "s"}${RESET}`;
   if (criticalAccounts.length > 0) {
     intTitleRight = `${CORAL}! ${criticalAccounts.length} crítico${RESET}`;
   } else if (warningAccounts.length > 0) {
@@ -1880,7 +1881,7 @@ if (process.stdin.isTTY) {
     if (key === "q" || key === "\u0003") {
       cleanupAndExit();
     } else if (key === "r" || key === "R") {
-      fetchQuotas(true); // Forzar actualización de TODAS las 5 cuentas bajo demanda
+      fetchQuotas(true); // Forzar actualización de TODAS las cuentas bajo demanda
     } else if (key === "d" || key === "D") {
       releaseInactiveSessions(); // Deseleccionar/archivar sesiones huérfanas en desuso
     } else if (key === "x" || key === "X") {
@@ -1936,6 +1937,6 @@ process.stdout.on("resize", () => {
 // Inicio del ciclo de vida
 discoverAccounts();
 render();
-fetchQuotas(true); // Primer barrido de las 5 cuentas para pintar la foto completa
+fetchQuotas(true); // Primer barrido de todas las cuentas para pintar la foto completa
 setInterval(() => fetchQuotas(false), POLL_INTERVAL_MS); // Cada 2m solo cuentas activas
 setInterval(checkLocalActivity, 3_000); // Chequeo local reactivo de turnos sin tráfico de red
