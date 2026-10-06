@@ -1834,8 +1834,8 @@ function render() {
   const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
   const shortcutHint = hasActiveCritical
-    ? `${TEXT_DIM} 1-9/clic: colapsar · o: abrir carpeta · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir${RESET}`
-    : `${TEXT_DIM} 1-9/clic: colapsar · o: abrir carpeta · c: todo · r: act · q: salir${RESET}`;
+    ? `${TEXT_DIM} 1-9: colapsar · s: sync · o: abrir · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir${RESET}`
+    : `${TEXT_DIM} 1-9: colapsar · s: sync · o: abrir · c: todo · r: act · q: salir${RESET}`;
   lines.push(shortcutHint);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
