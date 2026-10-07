@@ -813,6 +813,92 @@ function getMcpData(targetDir) {
   return mcpList;
 }
 
+// 3B. Mapeo de Subagentes SDD a Cuentas y Familias de Modelos
+let cachedOpencodeConfig = null;
+let cachedOpencodeConfigTime = 0;
+
+function resolveOpencodeConfig(targetDir) {
+  const candidatePaths = [
+    "D:/.opencode/opencode.json",
+    path.join(targetDir, "opencode.json"),
+    path.join(targetDir, ".opencode", "opencode.json"),
+    path.join(os.homedir(), ".config", "opencode", "opencode.json"),
+    path.join(os.homedir(), ".opencode", "opencode.json"),
+  ];
+  if (process.env.OPENCODE_CONFIG_DIR) {
+    candidatePaths.unshift(path.join(process.env.OPENCODE_CONFIG_DIR, "opencode.json"));
+  }
+
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        const stats = fs.statSync(p);
+        if (cachedOpencodeConfig && cachedOpencodeConfigTime === stats.mtimeMs) {
+          return cachedOpencodeConfig;
+        }
+        const raw = fs.readFileSync(p, "utf8");
+        cachedOpencodeConfig = JSON.parse(raw);
+        cachedOpencodeConfigTime = stats.mtimeMs;
+        return cachedOpencodeConfig;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+function getSddSubagentAccountMap(orchestratorAgent, targetDir) {
+  const accountModelMap = new Map(); // prefix -> { family, model }
+  if (!orchestratorAgent) return accountModelMap;
+
+  const cfg = resolveOpencodeConfig(targetDir);
+  if (!cfg) return accountModelMap;
+
+  const m = orchestratorAgent.match(/sdd-orchestrator-(.+)/i);
+  const profile = m ? m[1].toLowerCase() : "";
+
+  const agentSections = [];
+  if (cfg.agent && typeof cfg.agent === "object") agentSections.push(cfg.agent);
+  if (cfg.agents && typeof cfg.agents === "object") agentSections.push(cfg.agents);
+
+  for (const section of agentSections) {
+    for (const [name, def] of Object.entries(section)) {
+      const lowerName = name.toLowerCase();
+      const isMatch = profile
+        ? lowerName.startsWith("sdd-") && lowerName.endsWith(`-${profile}`) && !lowerName.includes("orchestrator")
+        : lowerName.startsWith("sdd-") && !lowerName.includes("orchestrator");
+
+      if (isMatch && def?.model) {
+        let modelStr = typeof def.model === "string" ? def.model : (def.model.id || "");
+        let cleanModel = modelStr.replace(/^cliproxy\//i, "");
+        let pfx = null;
+        let modelKey = cleanModel;
+
+        if (cleanModel.includes("/")) {
+          const parts = cleanModel.split("/");
+          pfx = parts[0].toLowerCase();
+          modelKey = parts.slice(1).join("/");
+        }
+
+        if (pfx) {
+          let family = "Otro";
+          const lowerKey = modelKey.toLowerCase();
+          if (lowerKey.includes("claude") || lowerKey.includes("opus") || lowerKey.includes("sonnet")) {
+            family = "Claude";
+          } else if (lowerKey.includes("gemini") || lowerKey.includes("flash") || lowerKey.includes("pro")) {
+            family = "Gemini";
+          } else if (lowerKey.includes("gpt") || lowerKey.includes("openai") || lowerKey.includes("oss")) {
+            family = "GPT";
+          }
+
+          accountModelMap.set(pfx, { family, model: modelKey });
+        }
+      }
+    }
+  }
+
+  return accountModelMap;
+}
+
 // 3. Engram Data
 function getEngramData(projectName, projectDir) {
   let canonicalName = projectName;
@@ -1715,38 +1801,44 @@ function render() {
 
   if (isMultiModelSDD) {
     // ESCENARIO 1: SDD Multi-Modelo / Distribuido (Batería de cuentas consolidada)
-    // Se adapta dinámicamente a la familia de modelos del agente activo (Claude, Gemini, etc.)
+    // Detecta qué modelo y familia corre en cada cuenta según el mapeo de subagentes en opencode.json
+    const subagentMap = getSddSubagentAccountMap(opencode.agent, targetDir);
+    const agentModelStr = `${opencode.agent || ""} ${opencode.model || ""}`.toLowerCase();
+    const fallbackFamily = agentModelStr.includes("claude") ? "Claude" : (agentModelStr.includes("gemini") ? "Gemini" : "Claude");
+
+    // Filtrar cuentas: si se detectó un mapeo de subagentes, solo mostrar las cuentas involucradas;
+    // de lo contrario, mostrar todas las cuentas disponibles
     const accountsWithPools = accountsList.filter((a) => a.pools && a.pools.length > 0);
+    const targetAccounts = subagentMap.size > 0
+      ? accountsWithPools.filter((a) => subagentMap.has(a.prefix.toLowerCase()))
+      : accountsWithPools;
 
-    if (accountsWithPools.length > 0) {
-      const agentModelStr = `${opencode.agent || ""} ${opencode.model || ""}`.toLowerCase();
-      const prefersClaude = agentModelStr.includes("claude");
-      const prefersGemini = agentModelStr.includes("gemini");
-
-      // Buscar el pool correspondiente según la familia del modelo o fallback automático
-      const resolveTargetPool = (acc) => {
-        if (prefersClaude) {
-          const p = acc.pools.find((x) => x.label?.toLowerCase().includes("claude") && x.label?.includes("5h"));
-          if (p) return p;
-        }
-        if (prefersGemini) {
-          const p = acc.pools.find((x) => x.label?.toLowerCase().includes("gemini") && x.label?.includes("5h"));
-          if (p) return p;
-        }
-        // Fallback genérico: primer pool de 5h o el primer pool disponible
-        return acc.pools.find((x) => x.label?.includes("5h")) || acc.pools[0];
-      };
-
+    if (targetAccounts.length > 0) {
       const distributedRows = [];
-      for (const acc of accountsWithPools) {
-        const pool = resolveTargetPool(acc);
-        if (pool) {
+      for (const acc of targetAccounts) {
+        const mapping = subagentMap.get(acc.prefix.toLowerCase());
+        const family = mapping ? mapping.family : fallbackFamily;
+
+        // Buscar el pool adecuado según la familia de modelo asignada a esta cuenta
+        let targetPool = null;
+        if (family === "Claude") {
+          targetPool = acc.pools.find((x) => x.label?.toLowerCase().includes("claude") && x.label?.includes("5h"));
+        } else if (family === "Gemini") {
+          targetPool = acc.pools.find((x) => x.label?.toLowerCase().includes("gemini") && x.label?.includes("5h"));
+        }
+
+        // Fallback si no encuentra el pool específico
+        if (!targetPool) {
+          targetPool = acc.pools.find((x) => x.label?.includes("5h")) || acc.pools[0];
+        }
+
+        if (targetPool) {
           distributedRows.push({
             prefix: acc.prefix,
-            percent: pool.percent,
-            pace: pool.pace,
-            reset: pool.reset,
-            isActive: activePrefixes.has(acc.prefix.toLowerCase()),
+            family,
+            percent: targetPool.percent,
+            pace: targetPool.pace,
+            reset: targetPool.reset,
             hasError: acc.hasError,
             errorMsg: acc.errorMsg,
           });
@@ -1761,20 +1853,26 @@ function render() {
         if (!collapsedCards.pools) {
           const poolGaugeCells = 8;
           for (const row of distributedRows) {
-            const marker = row.isActive ? `${ACCENT_PINK}>${RESET}` : " ";
             const threshold = getQuotaThreshold(row.percent);
-            const pfxDisplay = row.isActive
-              ? `${BOLD}${TEXT_PRIMARY}${row.prefix.padEnd(9)}${RESET}`
-              : `${TEXT_MUTED}${row.prefix.padEnd(9)}${RESET}`;
+            const shortPrefix = row.prefix.length > 8 ? row.prefix.slice(0, 7) + "…" : row.prefix.padEnd(8);
+            const pfxDisplay = `${BOLD}${TEXT_PRIMARY}${shortPrefix}${RESET}`;
+
+            // Tag visual por familia de modelo (sin marcador '>' redundante)
+            let tagColor = CYAN;
+            if (row.family === "Gemini") tagColor = MINT;
+            else if (row.family === "GPT") tagColor = MAGENTA;
+            const tagDisplay = `${tagColor}[${row.family.slice(0, 6)}]${RESET}`;
+
             const bar = renderGaugeInline(row.percent, poolGaugeCells, threshold.color);
             const pctFmt = `${BOLD}${threshold.color(String(row.percent).padStart(3) + "%")}${RESET}`;
             const paceStr = row.pace ? `${row.pace.color}${row.pace.text}${RESET} ` : "";
             const resetStr = row.reset ? `${TEXT_DIM}${row.reset}${RESET}` : "";
 
+            const leftCol = `${pfxDisplay} ${tagDisplay} ${bar} ${pctFmt}`;
             if (row.hasError) {
-              lines.push(drawRow(`${marker} ${pfxDisplay} ${bar} ${pctFmt}`, `${AMBER}${row.errorMsg}${RESET}`));
+              lines.push(drawRow(leftCol, `${AMBER}${row.errorMsg}${RESET}`));
             } else {
-              lines.push(drawRow(`${marker} ${pfxDisplay} ${bar} ${pctFmt}`, `${paceStr}${resetStr}`.trim()));
+              lines.push(drawRow(leftCol, `${paceStr}${resetStr}`.trim()));
             }
           }
 
