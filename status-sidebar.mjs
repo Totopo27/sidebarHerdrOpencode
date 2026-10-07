@@ -899,29 +899,7 @@ function getSddSubagentAccountMap(orchestratorAgent, targetDir) {
   return accountModelMap;
 }
 
-// 3C. Sistema de Insignias e Iconos Vendor (Compatible con herdr-radar)
-let isFontChecked = false;
-let isFontAvailable = false;
-
-function hasHerdrFont() {
-  if (isFontChecked) return isFontAvailable;
-  isFontChecked = true;
-  try {
-    const fontsDir = path.join(
-      process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
-      "Microsoft",
-      "Windows",
-      "Fonts"
-    );
-    const iconFont = path.join(fontsDir, "HerdrAgentIconsMax-Regular.ttf");
-    const mergedFont = path.join(fontsDir, "JetBrainsMonoHerdr-Regular.ttf");
-    if (fs.existsSync(iconFont) || fs.existsSync(mergedFont)) {
-      isFontAvailable = true;
-    }
-  } catch {}
-  return isFontAvailable;
-}
-
+// 3C. Insignias de Familia de Modelos (Colores semánticos Linear)
 const VENDOR_MARKS = {
   claude: { name: "Claude", color: CYAN },
   gemini: { name: "Gemini", color: MINT },
@@ -1897,7 +1875,7 @@ function render() {
             const shortPrefix = row.prefix.length > 8 ? row.prefix.slice(0, 7) + "…" : row.prefix.padEnd(8);
             const pfxDisplay = `${BOLD}${TEXT_PRIMARY}${shortPrefix}${RESET}`;
 
-            // Insignia visual con glifo e identidad de familia (compatible con herdr-radar)
+            // Insignia visual con identidad de familia (colores semánticos Linear)
             const vMark = getVendorMark(row.family);
             const tagDisplay = vMark.badge;
 

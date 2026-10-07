@@ -13,8 +13,7 @@
     "start": "node status-sidebar.mjs",
     "attach": "node attach-sidebar.mjs",
     "snew": "node snew.mjs",
-    "sclose": "node sclose.mjs",
-    "install-font": "node install-icons-font.mjs"
+    "sclose": "node sclose.mjs"
   },
   "keywords": [
     "opencode",
