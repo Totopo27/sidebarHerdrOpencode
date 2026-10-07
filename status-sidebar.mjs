@@ -2042,13 +2042,13 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "mcp", startLine: mcpStart, endLine: lines.length - 1 });
 
-  // Barra de atajos inferior dinámica: solo sugerir 'x: migrar' si hay cuentas críticas que estén REALMENTE ACTIVAS
+  // Barra de atajos inferior estructurada (2 líneas para evitar line-wrap en 46 cols)
   const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
-  const shortcutHint = hasActiveCritical
-    ? `${TEXT_DIM} 1-9: colapsar · s: sync · o: abrir · ${CORAL}x: migrar a ${targetHealthy}${TEXT_DIM} · q: salir${RESET}`
-    : `${TEXT_DIM} 1-9: colapsar · s: sync · o: abrir · c: todo · r: act · q: salir${RESET}`;
-  lines.push(shortcutHint);
+  const criticalAction = hasActiveCritical ? `${CORAL}x: migrar (${targetHealthy})${TEXT_DIM} · ${RESET}` : "";
+
+  lines.push(`${TEXT_DIM} 1-9: colapsar · c: todo · d: liberar · o: abrir${RESET}`);
+  lines.push(`${TEXT_DIM} s: sync · r: act · ${criticalAction}q: salir${RESET}`);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana
   const maxVisibleRows = Math.max(10, rows - 1);
