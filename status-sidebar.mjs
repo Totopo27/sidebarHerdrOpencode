@@ -1704,32 +1704,86 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "integraciones", startLine: integracionesStart, endLine: lines.length - 1 });
 
-  // 5B. ✿ Active Account Pools Breakdown Card (Gemini Wk/5h + Claude Wk/5h)
-  const targetActiveAccounts = accountsList.filter((a) => activePrefixes.has(a.prefix.toLowerCase()));
-  const poolCardsToShow = targetActiveAccounts.length > 0 ? targetActiveAccounts : (accountsList.slice(0, 1));
+  // 5B. Consolidated Claude SDD Pools Card
+  // Shows Claude 5h pool for ALL accounts in one compact card.
+  // When no Claude pools are available, falls back to showing all pools of active accounts.
+  const accountsWithPools = accountsList.filter((a) => a.pools && a.pools.length > 0);
 
-  for (const acc of poolCardsToShow) {
-    if (acc.pools && acc.pools.length > 0) {
-      const activeTag = activePrefixes.has(acc.prefix.toLowerCase()) ? " (activa)" : "";
+  if (accountsWithPools.length > 0) {
+    // Collect Claude 5h pool per account
+    const claudeRows = [];
+    for (const acc of accountsWithPools) {
+      const claude5h = acc.pools.find((p) => p.label === "Claude 5h");
+      if (claude5h) {
+        claudeRows.push({
+          prefix: acc.prefix,
+          percent: claude5h.percent,
+          pace: claude5h.pace,
+          reset: claude5h.reset,
+          isActive: activePrefixes.has(acc.prefix.toLowerCase()),
+          hasError: acc.hasError,
+          errorMsg: acc.errorMsg,
+        });
+      }
+    }
+
+    // If no Claude pools found, fall back to Gemini 5h
+    if (claudeRows.length === 0) {
+      for (const acc of accountsWithPools) {
+        const gemini5h = acc.pools.find((p) => p.label === "Gemini 5h");
+        if (gemini5h) {
+          claudeRows.push({
+            prefix: acc.prefix,
+            percent: gemini5h.percent,
+            pace: gemini5h.pace,
+            reset: gemini5h.reset,
+            isActive: activePrefixes.has(acc.prefix.toLowerCase()),
+            hasError: acc.hasError,
+            errorMsg: acc.errorMsg,
+          });
+        }
+      }
+    }
+
+    if (claudeRows.length > 0) {
       const poolsStart = lines.length;
-      lines.push(drawTop(`${GOLD}Antigravity${RESET} ${TEXT_DIM}·${RESET} ${MINT}${acc.prefix}${activeTag}${RESET}`, collapsedCards.pools));
+      const poolLabel = claudeRows[0] ? "Claude SDD" : "Pools";
+      const accountCountBadge = `${TEXT_DIM}${claudeRows.length} cuentas${RESET}`;
+      lines.push(drawTop(`${GOLD}${poolLabel}${RESET} ${TEXT_DIM}·${RESET} ${accountCountBadge}`, collapsedCards.pools));
 
       if (!collapsedCards.pools) {
-        if (acc.hasError) {
-          lines.push(drawRow(`${AMBER}! ${acc.errorMsg}${RESET}`));
+        const poolGaugeCells = 8;
+        for (const row of claudeRows) {
+          const marker = row.isActive ? `${ACCENT_PINK}>${RESET}` : " ";
+          const threshold = getQuotaThreshold(row.percent);
+          const pfxDisplay = row.isActive
+            ? `${BOLD}${TEXT_PRIMARY}${row.prefix.padEnd(9)}${RESET}`
+            : `${TEXT_MUTED}${row.prefix.padEnd(9)}${RESET}`;
+          const bar = renderGaugeInline(row.percent, poolGaugeCells, threshold.color);
+          const pctFmt = `${BOLD}${threshold.color(String(row.percent).padStart(3) + "%")}${RESET}`;
+          const paceStr = row.pace ? `${row.pace.color}${row.pace.text}${RESET} ` : "";
+          const resetStr = row.reset ? `${TEXT_DIM}${row.reset}${RESET}` : "";
+
+          if (row.hasError) {
+            lines.push(drawRow(`${marker} ${pfxDisplay} ${bar} ${pctFmt}`, `${AMBER}${row.errorMsg}${RESET}`));
+          } else {
+            lines.push(drawRow(`${marker} ${pfxDisplay} ${bar} ${pctFmt}`, `${paceStr}${resetStr}`.trim()));
+          }
         }
 
-        const poolGaugeCells = 8;
-        for (const p of acc.pools) {
-          const threshold = getQuotaThreshold(p.percent);
-          const pctFmt = `${BOLD}${threshold.color(String(p.percent).padStart(3) + "%")}${RESET}`;
-          const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
-          const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
-          const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-          const leftCol = `${threshold.color("*")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
-          const rightCol = `${paceStr}${resetStr}`.trim();
-          lines.push(drawRow(leftCol, rightCol));
-        }
+        // Summary row: min and average
+        const percents = claudeRows.map((r) => r.percent);
+        const minPct = Math.min(...percents);
+        const avgPct = Math.round(percents.reduce((a, b) => a + b, 0) / percents.length);
+        const minAcc = claudeRows.find((r) => r.percent === minPct);
+        const minThreshold = getQuotaThreshold(minPct);
+        const avgThreshold = getQuotaThreshold(avgPct);
+
+        lines.push(drawDivider());
+        lines.push(drawRow(
+          `${minThreshold.color(`min: ${minPct}%`)} ${TEXT_DIM}(${minAcc?.prefix || "?"})${RESET}`,
+          `${avgThreshold.color(`prom: ${avgPct}%`)}`,
+        ));
       }
 
       lines.push(drawBottom());
