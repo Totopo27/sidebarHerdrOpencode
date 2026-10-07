@@ -923,25 +923,24 @@ function hasHerdrFont() {
 }
 
 const VENDOR_MARKS = {
-  claude: { pua: "\uE1A0", text: "§", name: "Claude", color: CYAN },
-  gemini: { pua: "\uE1AE", text: "✦", name: "Gemini", color: MINT },
-  gpt: { pua: "\uE1AF", text: "✺", name: "GPT", color: MAGENTA },
-  agy: { pua: "\uE1B2", text: "△", name: "Antigravity", color: GOLD },
-  opencode: { pua: "\uE1A2", text: "◇", name: "OpenCode", color: ACCENT_PRIMARY },
-  deepseek: { pua: "\uE1AD", text: "≋", name: "DeepSeek", color: CYAN },
+  claude: { glyph: "✻", name: "Claude", color: CYAN },
+  gemini: { glyph: "✦", name: "Gemini", color: MINT },
+  gpt: { glyph: "✺", name: "GPT", color: MAGENTA },
+  agy: { glyph: "△", name: "Antigravity", color: GOLD },
+  opencode: { glyph: "◇", name: "OpenCode", color: ACCENT_PRIMARY },
+  deepseek: { glyph: "≋", name: "DeepSeek", color: CYAN },
 };
 
 function getVendorMark(vendorKey) {
   const key = (vendorKey || "").toLowerCase();
   const v = VENDOR_MARKS[key] || VENDOR_MARKS.claude;
-  const usePua = hasHerdrFont();
-  const glyph = usePua ? v.pua : v.text;
+  const glyph = v.glyph;
   return {
     glyph,
     name: v.name,
     color: v.color,
     colored: `${v.color}${glyph}${RESET}`,
-    badge: `${v.color}[${glyph}  ${v.name}]${RESET}`,
+    badge: `${v.color}[${glyph} ${v.name}]${RESET}`,
     compactBadge: `${v.color}[${glyph}]${RESET}`,
   };
 }
@@ -1966,7 +1965,7 @@ function render() {
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
             const poolVendorKey = p.label.toLowerCase().includes("claude") ? "claude" : "gemini";
             const poolMark = getVendorMark(poolVendorKey);
-            const leftCol = ` ${threshold.color(poolMark.glyph)}  ${TEXT_PRIMARY}${p.label.padEnd(8)}${RESET} ${bar} ${pctFmt}`;
+            const leftCol = ` ${threshold.color(poolMark.glyph)} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
