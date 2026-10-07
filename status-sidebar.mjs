@@ -941,7 +941,7 @@ function getVendorMark(vendorKey) {
     name: v.name,
     color: v.color,
     colored: `${v.color}${glyph}${RESET}`,
-    badge: `${v.color}[${glyph} ${v.name}]${RESET}`,
+    badge: `${v.color}[${glyph}  ${v.name}]${RESET}`,
     compactBadge: `${v.color}[${glyph}]${RESET}`,
   };
 }
@@ -1626,11 +1626,10 @@ function render() {
 
   const lines = [];
 
-  // 1. Encabezado Técnico de Marca (Linear Aesthetic con marcas de proveedor)
-  const ocMark = getVendorMark("opencode");
-  const bannerLeft = `${ACCENT_PRIMARY}${ocMark.glyph} OPENCODE${RESET}`;
-  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}${ocMark.glyph}${RESET}`;
-  const bannerRaw = `${ocMark.glyph} OPENCODE · GENTLE-AI ${ocMark.glyph}`;
+  // 1. Encabezado Técnico de Marca (Linear Aesthetic)
+  const bannerLeft = `${ACCENT_PRIMARY}:: OPENCODE${RESET}`;
+  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}::${RESET}`;
+  const bannerRaw = ":: OPENCODE · GENTLE-AI ::";
   const bannerPad = Math.max(0, Math.floor((width - stringWidth(bannerRaw)) / 2));
   lines.push(`${" ".repeat(bannerPad)}${bannerLeft} ${bannerRight}`);
 
@@ -1769,33 +1768,31 @@ function render() {
       for (const acc of accountsList) {
         // Detección multi-sesión: si la cuenta está activa en cualquier sesión abierta, se marca con ▸
         const isActive = activePrefixes.has(acc.prefix.toLowerCase());
-        const marker = isActive ? `${ACCENT_PINK}>${RESET}` : " ";
-        
-        let icon = `${MINT}*${RESET}`;
         let pctColor = MINT;
+        let statusGlyph = isActive ? `${ACCENT_PINK}>${RESET}` : `${MINT}*${RESET}`;
         let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
 
         if (acc.hasError) {
-          icon = `${AMBER}?${RESET}`;
+          statusGlyph = `${AMBER}?${RESET}`;
           pctColor = AMBER;
           statusNote = `${AMBER}[${acc.errorMsg}]${RESET}`;
         } else if (acc.isCritical) {
-          icon = `${BOLD}${CORAL}!${RESET}`;
+          statusGlyph = `${BOLD}${CORAL}!${RESET}`;
           pctColor = CORAL;
           statusNote = `${BOLD}${CORAL}[AGOTÁNDOSE]${RESET}`;
         } else if (acc.isWarning) {
-          icon = `${BOLD}${AMBER}!${RESET}`;
+          statusGlyph = `${BOLD}${AMBER}!${RESET}`;
           pctColor = AMBER;
           statusNote = `${AMBER}[AVISO 70%]${RESET}`;
         }
 
         const pfxDisplay = isActive
-          ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(7)}${RESET}`
-          : `${TEXT_MUTED}${acc.prefix.padEnd(7)}${RESET}`;
+          ? `${BOLD}${TEXT_PRIMARY}${acc.prefix.padEnd(8)}${RESET}`
+          : `${TEXT_MUTED}${acc.prefix.padEnd(8)}${RESET}`;
 
         const pctDisplay = `${BOLD}${pctColor}${String(acc.rem5h).padStart(3)}%${RESET}`;
         const bar = renderGaugeInline(acc.rem5h, 8, pctColor);
-        const leftCol = `${marker} ${icon} ${pfxDisplay} ${bar} ${pctDisplay}`;
+        const leftCol = `${statusGlyph} ${pfxDisplay} ${bar} ${pctDisplay}`;
         const rightCol = statusNote;
 
         lines.push(drawRow(leftCol, rightCol));
@@ -1969,7 +1966,7 @@ function render() {
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
             const poolVendorKey = p.label.toLowerCase().includes("claude") ? "claude" : "gemini";
             const poolMark = getVendorMark(poolVendorKey);
-            const leftCol = `${threshold.color(poolMark.glyph)} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
+            const leftCol = `${threshold.color(poolMark.glyph)}  ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
