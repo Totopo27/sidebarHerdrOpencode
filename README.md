@@ -262,6 +262,27 @@ node "%~dp0\sclose.mjs" %*
 
 ---
 
+## Icon Font & Vendor Badges (Optional)
+
+Sidebar Herdr OpenCode includes native support for official AI vendor logos (Claude, Gemini, GPT, Antigravity, OpenCode, DeepSeek) inspired by [`hhdebb/herdr-radar`](https://github.com/hhdebb/herdr-radar).
+
+### Adaptive Rendering Architecture
+- **With Font Installed**: Automatically detects the `Herdr Agent Icons Max` font and renders official vendor logos from Unicode Private Use Area (PUA).
+- **Without Font (Default Fallback)**: Automatically falls back to universally supported Unicode text glyphs (`§` for Claude, `✦` for Gemini, `✺` for GPT, `△` for Antigravity) with zero configuration. It will never break or render boxes on any terminal.
+
+### One-Click Font Installation (Windows)
+To install the vector icon fonts for your user:
+
+```bash
+npm run install-font
+```
+
+This downloads `HerdrAgentIconsMax-Regular.ttf` and `JetBrainsMonoHerdr-Regular.ttf` (JetBrains Mono with embedded icons) into `%LOCALAPPDATA%\Microsoft\Windows\Fonts` and registers them for your user.
+
+*(Optional)* In Windows Terminal Settings, set your font to `JetBrains Mono Herdr` to see the full vector brand icons.
+
+---
+
 ## License
 
 Distributed under the **MIT License**. Engineered for technical precision, performance density, and stability within OpenCode, Herdr, and Gentle-AI workflows.

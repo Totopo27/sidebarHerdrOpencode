@@ -899,6 +899,53 @@ function getSddSubagentAccountMap(orchestratorAgent, targetDir) {
   return accountModelMap;
 }
 
+// 3C. Sistema de Insignias e Iconos Vendor (Compatible con herdr-radar)
+let isFontChecked = false;
+let isFontAvailable = false;
+
+function hasHerdrFont() {
+  if (isFontChecked) return isFontAvailable;
+  isFontChecked = true;
+  try {
+    const fontsDir = path.join(
+      process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
+      "Microsoft",
+      "Windows",
+      "Fonts"
+    );
+    const iconFont = path.join(fontsDir, "HerdrAgentIconsMax-Regular.ttf");
+    const mergedFont = path.join(fontsDir, "JetBrainsMonoHerdr-Regular.ttf");
+    if (fs.existsSync(iconFont) || fs.existsSync(mergedFont)) {
+      isFontAvailable = true;
+    }
+  } catch {}
+  return isFontAvailable;
+}
+
+const VENDOR_MARKS = {
+  claude: { pua: "\uE1A0", text: "§", name: "Claude", color: CYAN },
+  gemini: { pua: "\uE1AE", text: "✦", name: "Gemini", color: MINT },
+  gpt: { pua: "\uE1AF", text: "✺", name: "GPT", color: MAGENTA },
+  agy: { pua: "\uE1B2", text: "△", name: "Antigravity", color: GOLD },
+  opencode: { pua: "\uE1A2", text: "◇", name: "OpenCode", color: ACCENT_PRIMARY },
+  deepseek: { pua: "\uE1AD", text: "≋", name: "DeepSeek", color: CYAN },
+};
+
+function getVendorMark(vendorKey) {
+  const key = (vendorKey || "").toLowerCase();
+  const v = VENDOR_MARKS[key] || VENDOR_MARKS.claude;
+  const usePua = hasHerdrFont();
+  const glyph = usePua ? v.pua : v.text;
+  return {
+    glyph,
+    name: v.name,
+    color: v.color,
+    colored: `${v.color}${glyph}${RESET}`,
+    badge: `${v.color}[${glyph} ${v.name}]${RESET}`,
+    compactBadge: `${v.color}[${glyph}]${RESET}`,
+  };
+}
+
 // 3. Engram Data
 function getEngramData(projectName, projectDir) {
   let canonicalName = projectName;
@@ -1579,10 +1626,11 @@ function render() {
 
   const lines = [];
 
-  // 1. Encabezado Técnico de Marca (Linear Aesthetic)
-  const bannerLeft = `${ACCENT_PRIMARY}:: OPENCODE${RESET}`;
-  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}::${RESET}`;
-  const bannerRaw = ":: OPENCODE · GENTLE-AI ::";
+  // 1. Encabezado Técnico de Marca (Linear Aesthetic con marcas de proveedor)
+  const ocMark = getVendorMark("opencode");
+  const bannerLeft = `${ACCENT_PRIMARY}${ocMark.glyph} OPENCODE${RESET}`;
+  const bannerRight = `${BORDER}· ${GOLD}GENTLE-AI ${ACCENT_PRIMARY}${ocMark.glyph}${RESET}`;
+  const bannerRaw = `${ocMark.glyph} OPENCODE · GENTLE-AI ${ocMark.glyph}`;
   const bannerPad = Math.max(0, Math.floor((width - stringWidth(bannerRaw)) / 2));
   lines.push(`${" ".repeat(bannerPad)}${bannerLeft} ${bannerRight}`);
 
@@ -1857,11 +1905,9 @@ function render() {
             const shortPrefix = row.prefix.length > 8 ? row.prefix.slice(0, 7) + "…" : row.prefix.padEnd(8);
             const pfxDisplay = `${BOLD}${TEXT_PRIMARY}${shortPrefix}${RESET}`;
 
-            // Tag visual por familia de modelo (sin marcador '>' redundante)
-            let tagColor = CYAN;
-            if (row.family === "Gemini") tagColor = MINT;
-            else if (row.family === "GPT") tagColor = MAGENTA;
-            const tagDisplay = `${tagColor}[${row.family.slice(0, 6)}]${RESET}`;
+            // Insignia visual con glifo e identidad de familia (compatible con herdr-radar)
+            const vMark = getVendorMark(row.family);
+            const tagDisplay = vMark.badge;
 
             const bar = renderGaugeInline(row.percent, poolGaugeCells, threshold.color);
             const pctFmt = `${BOLD}${threshold.color(String(row.percent).padStart(3) + "%")}${RESET}`;
@@ -1921,7 +1967,9 @@ function render() {
             const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
             const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-            const leftCol = `${threshold.color("*")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
+            const poolVendorKey = p.label.toLowerCase().includes("claude") ? "claude" : "gemini";
+            const poolMark = getVendorMark(poolVendorKey);
+            const leftCol = `${threshold.color(poolMark.glyph)} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
