@@ -923,25 +923,21 @@ function hasHerdrFont() {
 }
 
 const VENDOR_MARKS = {
-  claude: { glyph: "✻", name: "Claude", color: CYAN },
-  gemini: { glyph: "✦", name: "Gemini", color: MINT },
-  gpt: { glyph: "✺", name: "GPT", color: MAGENTA },
-  agy: { glyph: "△", name: "Antigravity", color: GOLD },
-  opencode: { glyph: "◇", name: "OpenCode", color: ACCENT_PRIMARY },
-  deepseek: { glyph: "≋", name: "DeepSeek", color: CYAN },
+  claude: { name: "Claude", color: CYAN },
+  gemini: { name: "Gemini", color: MINT },
+  gpt: { name: "GPT", color: MAGENTA },
+  agy: { name: "Antigravity", color: GOLD },
+  opencode: { name: "OpenCode", color: ACCENT_PRIMARY },
+  deepseek: { name: "DeepSeek", color: CYAN },
 };
 
 function getVendorMark(vendorKey) {
   const key = (vendorKey || "").toLowerCase();
   const v = VENDOR_MARKS[key] || VENDOR_MARKS.claude;
-  const glyph = v.glyph;
   return {
-    glyph,
     name: v.name,
     color: v.color,
-    colored: `${v.color}${glyph}${RESET}`,
-    badge: `${v.color}[${glyph} ${v.name}]${RESET}`,
-    compactBadge: `${v.color}[${glyph}]${RESET}`,
+    badge: `${v.color}[${v.name}]${RESET}`,
   };
 }
 
@@ -1963,9 +1959,7 @@ function render() {
             const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
             const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-            const poolVendorKey = p.label.toLowerCase().includes("claude") ? "claude" : "gemini";
-            const poolMark = getVendorMark(poolVendorKey);
-            const leftCol = ` ${threshold.color(poolMark.glyph)} ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
+            const leftCol = `${threshold.color("*")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
