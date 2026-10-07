@@ -1651,16 +1651,16 @@ function render() {
     if (isSaturated) {
       gaugeColor = CORAL;
       leftTokensStr = `${BOLD}${CORAL}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${CORAL}* Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+      rightContextStatus = `${CORAL}● Saturado ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
     } else if (isMature) {
       gaugeColor = AMBER;
       leftTokensStr = `${BOLD}${AMBER}${formatTokenCount(currentTokens)}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${AMBER}* Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
+      rightContextStatus = `${AMBER}● Maduro ${contextPercent.toFixed(1)}% [/snew]${RESET}`;
     } else {
       const contextThreshold = getQuotaThreshold(100 - contextPercent);
       gaugeColor = contextThreshold.color;
       leftTokensStr = `${BOLD}${contextThreshold.color(formatTokenCount(currentTokens))}${RESET} ${TEXT_DIM}/${RESET} ${TEXT_MUTED}${formatTokenCount(contextLimit)}${RESET}`;
-      rightContextStatus = `${contextThreshold.color("*")} ${BOLD}${contextThreshold.color(`Optimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
+      rightContextStatus = `${contextThreshold.color("●")} ${BOLD}${contextThreshold.color(`Optimo ${contextPercent.toFixed(1)}%`)}${RESET}`;
     }
 
     lines.push(drawRow(leftTokensStr, rightContextStatus));
@@ -1742,7 +1742,7 @@ function render() {
         // Detección multi-sesión: si la cuenta está activa en cualquier sesión abierta, se marca con ▸
         const isActive = activePrefixes.has(acc.prefix.toLowerCase());
         let pctColor = MINT;
-        let statusGlyph = isActive ? `${ACCENT_PINK}>${RESET}` : `${MINT}*${RESET}`;
+        let statusGlyph = isActive ? `${ACCENT_PINK}>${RESET}` : `${MINT}●${RESET}`;
         let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
 
         if (acc.hasError) {
@@ -1937,7 +1937,7 @@ function render() {
             const bar = renderGaugeInline(p.percent, poolGaugeCells, threshold.color);
             const paceStr = p.pace ? `${p.pace.color}${p.pace.text}${RESET} ` : "";
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
-            const leftCol = `${threshold.color("*")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
+            const leftCol = `${threshold.color("●")} ${TEXT_PRIMARY}${p.label.padEnd(10)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
@@ -1991,13 +1991,13 @@ function render() {
   const engramStart = lines.length;
   lines.push(drawTop(`${ACCENT_PRIMARY}Engram:${RESET} ${CYAN}${engram.project}${RESET} ${TEXT_DIM}^${RESET}`, collapsedCards.engram));
   if (!collapsedCards.engram) {
-    const localOnlineStatus = engram.online ? `${MINT}* En linea${RESET}` : `${CORAL}o Caido${RESET}`;
+    const localOnlineStatus = engram.online ? `${MINT}● En linea${RESET}` : `${CORAL}○ Caido${RESET}`;
     lines.push(drawRow(`Local (7437)`, `${localOnlineStatus} ${TEXT_DIM}·${RESET} ${CYAN}${engram.obsCount} obs${RESET}`));
     if (engram.cloudHost) {
-      const syncStatus = engram.enrolled ? `${MINT}* Enrolado${RESET}` : `${TEXT_DIM}o No sinc${RESET}`;
+      const syncStatus = engram.enrolled ? `${MINT}● Enrolado${RESET}` : `${TEXT_DIM}○ No sinc${RESET}`;
       lines.push(drawRow(`Cloud: ${TEXT_DIM}${engram.cloudHost}${RESET}`, `${syncStatus} ${CYAN}↗${RESET}`));
     } else {
-      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}o no configurado${RESET}`));
+      lines.push(drawRow(`Cloud: ${TEXT_DIM}solo local${RESET}`, `${TEXT_DIM}○ no configurado${RESET}`));
     }
   }
   lines.push(drawBottom());
@@ -2030,7 +2030,7 @@ function render() {
       lines.push(drawRow(`${TEXT_DIM}Sin servidores MCP configurados${RESET}`));
     } else {
       for (const mcp of mcpList) {
-        const statusDot = mcp.enabled ? `${MINT}*${RESET}` : `${AMBER}o${RESET}`;
+        const statusDot = mcp.enabled ? `${MINT}●${RESET}` : `${AMBER}○${RESET}`;
         const typeBadge = `${TEXT_DIM}[${mcp.type}]${RESET}`;
         const nameFmt = `${BOLD}${TEXT_PRIMARY}${mcp.name}${RESET}`;
         const statusText = mcp.enabled ? `${MINT}en línea${RESET}` : `${TEXT_MUTED}desactivado${RESET}`;
