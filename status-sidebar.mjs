@@ -1966,7 +1966,7 @@ function render() {
             const resetStr = p.reset ? `${TEXT_DIM}${p.reset}${RESET}` : "";
             const poolVendorKey = p.label.toLowerCase().includes("claude") ? "claude" : "gemini";
             const poolMark = getVendorMark(poolVendorKey);
-            const leftCol = `${threshold.color(poolMark.glyph)}  ${TEXT_PRIMARY}${p.label.padEnd(9)}${RESET} ${bar} ${pctFmt}`;
+            const leftCol = ` ${threshold.color(poolMark.glyph)}  ${TEXT_PRIMARY}${p.label.padEnd(8)}${RESET} ${bar} ${pctFmt}`;
             const rightCol = `${paceStr}${resetStr}`.trim();
             lines.push(drawRow(leftCol, rightCol));
           }
