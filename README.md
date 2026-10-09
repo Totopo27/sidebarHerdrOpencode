@@ -159,9 +159,9 @@ When running multiple spaces or tabs in Herdr with shared API accounts, closing 
 | **`q`** | Sidebar TUI | Clean exit restoring the previous terminal screen buffer. |
 | **`/snew`** | OpenCode Chat | **Session Handover:** Persists `mem_session_summary` in Engram and outputs a structured handover block to start a clean session. |
 | **`/sclose`** | OpenCode Chat | **Clean Session Termination:** Persists `mem_session_summary` in Engram, sets `time_archived` in `session_v2`, and releases the account in the HUD. |
-| **`snew`** | Terminal / Herdr | **Clean Workspace Tab:** Launches a fresh Herdr tab with OpenCode on the left (74%) and HUD on the right (26%). |
+| **`snew`** | Terminal / Herdr | **Clean Workspace Tab:** Launches a fresh Herdr tab with OpenCode on the left (80%) and HUD on the right (20%). |
 | **`sclose`** | Terminal / Herdr | **Local Archive:** Archives the active session for the current workspace directory and updates HUD state (`--close-tab` and `--close-pane` supported). |
-| **`sidebar`** | Terminal / Herdr | Attaches or connects the HUD sidebar with standard 74/26 layout ratio. |
+| **`sidebar`** | Terminal / Herdr | Attaches or connects the HUD sidebar with standard 80/20 layout ratio. |
 
 ### Natural Language Session Termination Triggers
 The orchestrator recognizes the following phrases to execute the session close workflow:
@@ -197,7 +197,7 @@ This sidebar is not a standalone mock; it is a cockpit operating directly on top
 |---|---|---|
 | **CPAMC** | [router-for-me/Cli-Proxy-API-Management-Center](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) | Web UI for CLIProxyAPI. Manages OAuth logins and generates the credentials inspected by the sidebar. |
 | **CLIProxyAPI** | [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) | Local proxy service (port `8317`). Powers multi-account routing, quota inspection endpoints, and auth storage (`~/.cliproxy/auths`). |
-| **Herdr** | [herdrdev/herdr](https://github.com/herdrdev/herdr) | Terminal multiplexer runtime. Hosts the sidebar split (0.74 / 0.26 ratio) via `herdr pane list` and `herdr pane current`. |
+| **Herdr** | [herdrdev/herdr](https://github.com/herdrdev/herdr) | Terminal multiplexer runtime. Hosts the sidebar split (0.80 / 0.20 ratio) via `herdr pane list` and `herdr pane current`. |
 | **OpenCode** | [OpenCode](https://github.com/opencode-ai/opencode) | Coding agent runtime. The sidebar queries `~/.local/share/opencode/opencode.db` directly to monitor sessions, context windows, and tools. |
 | **Engram** | [Gentleman-Programming/engram](https://github.com/Gentleman-Programming/engram) | Persistent memory daemon (port `7437`). Provides cross-session observations, project namespace tracking, and session sync. |
 
@@ -216,7 +216,7 @@ This sidebar is not a standalone mock; it is a cockpit operating directly on top
 ```text
 sidebarHerdrOpencode/
 ├── status-sidebar.mjs      Main TUI telemetry HUD script
-├── attach-sidebar.mjs      Split management script for Herdr (0.74/0.26 ratio)
+├── attach-sidebar.mjs      Split management script for Herdr (0.80/0.20 ratio)
 ├── snew.mjs                Clean session creator and handover script
 ├── sclose.mjs              Session termination and account de-allocation script
 ├── status-sidebar.cmd      Windows launcher for sidebar

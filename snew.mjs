@@ -275,8 +275,8 @@ if (inHerdr) {
         // Iniciar OpenCode en el pane izquierdo con el agente asignado a la cuenta óptima
         execFileSync("herdr", ["pane", "run", mainPaneId, `opencode --agent ${designatedAgent}`], { stdio: ["ignore", "pipe", "ignore"] });
 
-        // Crear split a la derecha para el sidebar (ratio 0.74 = 26% sidebar)
-        const splitRaw = execFileSync("herdr", ["pane", "split", "--pane", mainPaneId, "--direction", "right", "--ratio", "0.74", "--no-focus"], {
+        // Crear split a la derecha para el sidebar (ratio 0.80 = 20% sidebar)
+        const splitRaw = execFileSync("herdr", ["pane", "split", "--pane", mainPaneId, "--direction", "right", "--ratio", "0.80", "--no-focus"], {
           encoding: "utf8",
           stdio: ["ignore", "pipe", "ignore"],
         });

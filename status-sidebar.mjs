@@ -1172,6 +1172,12 @@ function checkLocalActivity() {
     }
     lastKnownTurnTime = sessionData.lastUpdatedTurn;
   }
+
+  // Refresca UI periódicamente si hay cuentas críticas/aviso para alternar la etiqueta y el timer
+  const hasAlertAccounts = accountsList.some((a) => (a.isCritical || a.isWarning) && !a.hasError);
+  if (hasAlertAccounts) {
+    scheduleRender();
+  }
 }
 
 function getBestHealthyTargetPrefix() {
@@ -1745,6 +1751,8 @@ function render() {
         let statusGlyph = isActive ? `${ACCENT_PINK}>${RESET}` : `${MINT}●${RESET}`;
         let statusNote = acc.reset5h ? `${TEXT_DIM}${acc.reset5h}${RESET}` : "";
 
+        const showTimerPhase = Boolean(acc.reset5h) && Math.floor(Date.now() / 3000) % 2 === 1;
+
         if (acc.hasError) {
           statusGlyph = `${AMBER}?${RESET}`;
           pctColor = AMBER;
@@ -1752,11 +1760,15 @@ function render() {
         } else if (acc.isCritical) {
           statusGlyph = `${BOLD}${CORAL}!${RESET}`;
           pctColor = CORAL;
-          statusNote = `${BOLD}${CORAL}[AGOTÁNDOSE]${RESET}`;
+          statusNote = showTimerPhase
+            ? `${TEXT_DIM}${acc.reset5h}${RESET}`
+            : `${BOLD}${CORAL}[AGOTÁNDOSE]${RESET}`;
         } else if (acc.isWarning) {
           statusGlyph = `${BOLD}${AMBER}!${RESET}`;
           pctColor = AMBER;
-          statusNote = `${AMBER}[AVISO 70%]${RESET}`;
+          statusNote = showTimerPhase
+            ? `${TEXT_DIM}${acc.reset5h}${RESET}`
+            : `${AMBER}[AVISO 70%]${RESET}`;
         }
 
         const pfxDisplay = isActive
@@ -2042,12 +2054,12 @@ function render() {
   lines.push(drawBottom());
   cardLineBounds.push({ id: "mcp", startLine: mcpStart, endLine: lines.length - 1 });
 
-  // Barra de atajos inferior estructurada (2 líneas para evitar line-wrap en 46 cols)
+  // Barra de atajos inferior estructurada (2 líneas para evitar line-wrap en anchos compactos)
   const hasActiveCritical = accountsList.some((a) => (a.isCritical || a.used5h >= 85) && activePrefixes.has(a.prefix.toLowerCase()));
   const targetHealthy = getBestHealthyTargetPrefix();
   const criticalAction = hasActiveCritical ? `${CORAL}x: migrar (${targetHealthy})${TEXT_DIM} · ${RESET}` : "";
 
-  lines.push(`${TEXT_DIM} 1-9: colapsar · c: todo · d: liberar · o: abrir${RESET}`);
+  lines.push(`${TEXT_DIM} 1-9: colap · c: todo · d: libre · o: abrir${RESET}`);
   lines.push(`${TEXT_DIM} s: sync · r: act · ${criticalAction}q: salir${RESET}`);
 
   // Viewport windowing: Asegura que el total de renglones no desborde jamás la ventana

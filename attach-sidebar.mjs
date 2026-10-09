@@ -29,9 +29,9 @@ try {
 
   // Si solo hay 1 pane en este tab: creamos el split a la derecha
   // En Herdr, --ratio define el tamaño del pane principal (izquierdo).
-  // ratio 0.74 deja el 74% a OpenCode y el 26% (~50-55 columnas) al sidebar lateral.
+  // ratio 0.80 deja el 80% a OpenCode y el 20% (~48-50 columnas) al sidebar lateral.
   if (panesInTab.length <= 1) {
-    const splitRaw = execSync("herdr pane split --current --direction right --ratio 0.74 --no-focus", {
+    const splitRaw = execSync("herdr pane split --current --direction right --ratio 0.80 --no-focus", {
       stdio: ["ignore", "pipe", "ignore"],
       encoding: "utf8",
     });
